@@ -1,5 +1,6 @@
 """真实 WebView2 的离线交互检查，不访问网站或调用模型。"""
 import base64
+import os
 import json
 from pathlib import Path
 import tempfile
@@ -42,15 +43,15 @@ def check(window,bridge):
         assert window.evaluate_js("document.querySelector('#page-settings').classList.contains('active')"), '设置页未切换'
         assert window.evaluate_js("document.querySelector('#page-settings .content').scrollHeight>=document.querySelector('#page-settings .content').clientHeight"), '设置页滚动异常'
         assert window.evaluate_js("document.querySelectorAll('input[type=password]').length===2"), '密码与密钥未遮蔽'
-        assert window.evaluate_js("document.querySelectorAll('.provider-card').length===10 && document.querySelector('#provider').value==='custom'"), '预设目录或旧配置识别错误'
-        window.evaluate_js("document.querySelector('#apikey').value='private-test-key'; [...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('通义千问 · 北京')).click()")
-        assert window.evaluate_js("document.querySelector('#apikey').value==='' && document.querySelector('#model').value==='qwen-plus' && !document.querySelector('#model').readOnly"), '新平台携带了旧 Key 或模型被锁死'
-        window.evaluate_js("document.querySelector('#model').value='my-qwen-model';document.querySelector('#apikey').value='qwen-private-test';[...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('自定义')).click()")
+        assert window.evaluate_js("document.querySelectorAll('.provider-card').length===5 && document.querySelector('#provider').value==='custom'"), '预设目录或旧配置识别错误'
+        window.evaluate_js("document.querySelector('#apikey').value='private-test-key'; [...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('DeepSeek')).click()")
+        assert window.evaluate_js("document.querySelector('#apikey').value==='' && document.querySelector('#model').value==='deepseek-flash' && !document.querySelector('#model').readOnly"), '新平台携带了旧 Key 或模型被锁死'
+        window.evaluate_js("document.querySelector('#model').value='my-deepseek-model';document.querySelector('#apikey').value='deepseek-private-test';[...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('自定义')).click()")
         assert window.evaluate_js("document.querySelector('#apikey').value==='private-test-key' && document.querySelector('#advanced').open"), '旧平台的未保存草稿丢失'
-        window.evaluate_js("[...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('通义千问 · 北京')).click()")
-        assert window.evaluate_js("document.querySelector('#apikey').value==='qwen-private-test' && document.querySelector('#model').value==='my-qwen-model'"), '来回切换未保留独立模型与密钥'
-        window.evaluate_js("document.querySelector('#providerSearch').value='openrouter';document.querySelector('#providerSearch').dispatchEvent(new Event('input'))")
-        assert window.evaluate_js("document.querySelectorAll('.provider-card').length===1 && document.querySelector('.provider-card').textContent.includes('OpenRouter')"), '服务商搜索失败'
+        window.evaluate_js("[...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('DeepSeek')).click()")
+        assert window.evaluate_js("document.querySelector('#apikey').value==='deepseek-private-test' && document.querySelector('#model').value==='my-deepseek-model'"), '来回切换未保留独立模型与密钥'
+        window.evaluate_js("document.querySelector('#providerSearch').value='openai';document.querySelector('#providerSearch').dispatchEvent(new Event('input'))")
+        assert window.evaluate_js("document.querySelectorAll('.provider-card').length===1 && document.querySelector('.provider-card').textContent.includes('OpenAI')"), '服务商搜索失败'
         window.evaluate_js("document.querySelector('#providerSearch').value='';document.querySelector('#providerSearch').dispatchEvent(new Event('input'))")
         window.evaluate_js("document.querySelector('#saveConnection').click()")
         deadline=time.monotonic()+5
@@ -66,16 +67,31 @@ def check(window,bridge):
         window.evaluate_js("document.querySelector('.connection-card').click()")
         deadline=time.monotonic()+5
         while time.monotonic()<deadline:
-            if window.evaluate_js("document.querySelector('#apikey').value==='qwen-private-test'"): break
+            if window.evaluate_js("document.querySelector('#apikey').value==='deepseek-private-test'"): break
             time.sleep(.05)
-        assert window.evaluate_js("document.querySelector('#model').value==='my-qwen-model' && document.querySelector('#apikey').value==='qwen-private-test'"), '连接切换未恢复模型与 Key'
-        window.evaluate_js("document.querySelector('#fetchModels').click()")
+        assert window.evaluate_js("document.querySelector('#model').value==='my-deepseek-model' && document.querySelector('#apikey').value==='deepseek-private-test'"), '连接切换未恢复模型与 Key'
+        window.evaluate_js("document.querySelector('#model').value='deepseek-flash';document.querySelector('#model').dispatchEvent(new Event('input'));document.querySelector('#fetchModels').click()")
         deadline=time.monotonic()+5
         while time.monotonic()<deadline:
-            if window.evaluate_js("document.querySelector('#availableModels').options.length===1"): break
+            if window.evaluate_js("document.querySelectorAll('.model-option').length===2"): break
             time.sleep(.05)
-        assert window.evaluate_js("document.querySelector('#availableModels').options[0].value==='ui-test-model'"), '模型获取结果未显示'
-        assert 'qwen-private-test' not in json.dumps(bridge.get_state()), '状态中泄露 Key'
+        assert window.evaluate_js("document.querySelectorAll('.model-option').length===2 && !document.querySelector('#modelPicker').hidden && document.querySelector('#model').getAttribute('list')===null"), '获取两个模型后仍被当前输入值过滤'
+        window.evaluate_js("[...document.querySelectorAll('.model-option')].find(b=>b.textContent==='deepseek-v4-pro').click()")
+        assert window.evaluate_js("document.querySelector('#model').value==='deepseek-v4-pro' && document.querySelector('#modelPicker').hidden"), '不能选择另一个模型'
+        bridge._touch();time.sleep(.5)
+        assert window.evaluate_js("document.querySelector('#modelPicker').hidden"), '旧请求结果重复打开列表'
+        window.evaluate_js("document.querySelector('#toggleModels').click();document.querySelector('#modelSearch').value='flash';document.querySelector('#modelSearch').dispatchEvent(new Event('input'))")
+        assert window.evaluate_js("document.querySelectorAll('.model-option').length===1 && document.querySelector('.model-option').textContent==='deepseek-flash'"), '独立模型搜索失败'
+        window.evaluate_js("document.querySelector('#base_url').value='https://different.example/v1';document.querySelector('#base_url').dispatchEvent(new Event('input'))")
+        assert window.evaluate_js("document.querySelectorAll('.model-option').length===0 && document.querySelector('#modelPicker').hidden"), '修改接口后沿用了旧模型列表'
+        assert 'deepseek-private-test' not in json.dumps(bridge.get_state()), '状态中泄露 Key'
+        window.evaluate_js("document.querySelector('#testAccount').click()")
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline:
+            if window.evaluate_js("document.querySelector('#accountTestResult').textContent.includes('登录测试通过')"): break
+            time.sleep(.05)
+        assert window.evaluate_js("document.querySelector('#accountTestResult').textContent.includes('登录测试通过')"), 'iTEST 登录测试结果未显示'
+        assert len(bridge.get_state()['papers'])==2, '登录测试改动了已有试卷列表'
         assert bridge._pending is None
         bridge._task=TaskProgress({'ksdId':'123','ksName':'离线进度检查'},True)
         bridge._task.consume('共 6 组、25 道题，需处理 33 份有效录音。')
@@ -141,9 +157,10 @@ if __name__=='__main__':
         bridge._config={'username':'offline-test','password':'test-password','sleep_time':1,'ai':{'model':'test-model','apikey':'test-key','base_url':'https://example.com/v1'}}
         bridge._session=bridge._config.copy()
         bridge._process=MagicMock()
-        bridge._state.update(connected=True,papers=[{'ksdId':'123','ksName':'示例英语听力'}, {'ksdId':'456','ksName':'<img src=x onerror=window.injected=1>'}])
+        bridge._state.update(page='papers',connected=True,papers=[{'ksdId':'123','ksName':'示例英语听力'}, {'ksdId':'456','ksName':'<img src=x onerror=window.injected=1>'}])
         html=(ROOT/'ui/index.html').read_text(encoding='utf-8').replace('__MODEL_SETTINGS_SCRIPT__',(ROOT/'ui/model-settings.js').read_text(encoding='utf-8')).replace('__ITEST_ICON__','data:image/png;base64,'+base64.b64encode((ROOT/'assets/itest-icon-32.png').read_bytes()).decode())
-        window=webview.create_window('iTEST offline UI check',html=html,js_api=bridge,width=680,height=480,hidden=True)
-        with patch('desktop_bridge.model_tool',return_value={'ok':True,'models':['ui-test-model'],'message':'离线模型列表'}):
+        test_width,test_height=map(int,os.environ.get('ITEST_UI_TEST_SIZE','680x480').split('x'))
+        window=webview.create_window('iTEST offline UI check',html=html,js_api=bridge,width=test_width,height=test_height,hidden=True)
+        with patch('desktop_bridge.model_tool',return_value={'ok':True,'models':['deepseek-flash','deepseek-v4-pro'],'message':'已获取 2 个模型'}), patch.object(bridge,'_send',side_effect=lambda command: bridge._event(bridge._process,{'event':'account-test','request_id':command['request_id'],'ok':True,'message':'登录测试通过，可读取试卷列表。'}) if command['action']=='check_login' else None):
             webview.start(check,(window,bridge),gui='edgechromium',private_mode=True)
     raise SystemExit(bool(errors))

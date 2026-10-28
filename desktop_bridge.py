@@ -52,7 +52,7 @@ class Bridge:
         self._task=None
         self._config={'username':'','password':'','sleep_time':10,'ai':{'provider':'deepseek','base_url':'https://api.deepseek.com','model':'deepseek-flash','apikey':''}}
         self._state={'version':0,'activity':'idle','busy':False,'stopping':False,'connected':False,'papers':[],
-            'model_tools':{'busy':False},'logs':[],'status':'准备就绪','notice':None,'progress':None,'task':None,'page':'papers','completed':False,'blocked_paper_ids':[]}
+            'account_test':{'busy':False},'model_tools':{'busy':False},'logs':[],'status':'准备就绪','notice':None,'progress':None,'task':None,'page':'papers','completed':False,'blocked_paper_ids':[]}
         try:
             file=self._root/'config.yml'
             if file.exists():
@@ -75,6 +75,9 @@ class Bridge:
             self._state['page']='settings'
             self._notice('模型连接文件无法读取，原文件已保留，请检查 model_connections.yml。',True)
 
+        if not self._config.get('username') or not self._config.get('password'):
+            self._state['page']='settings'
+
     def get_connections(self):
         with self._lock:
             return self._connections.summary() if self._connections else {'active_id':None,'connections':[]}
@@ -96,6 +99,28 @@ class Bridge:
                 return {'ok':False,'message':str(error)}
             except Exception:
                 return {'ok':False,'message':'连接保存失败，原配置仍保留，请检查本地数据目录。'}
+
+    def start_account_test(self,value):
+        with self._lock:
+            try:
+                if self._state['busy']: raise ValueError('请等待当前任务结束。')
+                if not isinstance(value,dict) or not isinstance(value.get('username'),str) or not isinstance(value.get('password'),str):
+                    raise ValueError('请填写 iTEST 账号和密码。')
+                config={'username':value['username'].strip(),'password':value['password'],'sleep_time':0}
+                if not config['username'] or not config['password']: raise ValueError('请填写 iTEST 账号和密码。')
+                request_id=uuid.uuid4().hex
+                self._state['account_test']={'busy':True,'request_id':request_id}
+                self._state.update(busy=True,activity='account-test',page='settings',status='正在测试 iTEST 登录；如有验证码，请在测试浏览器中完成。')
+                self._send({'action':'check_login','config':config,'request_id':request_id})
+                self._touch()
+                return {'ok':True,'request_id':request_id}
+            except ValueError as error:
+                return {'ok':False,'message':str(error)}
+            except Exception:
+                self._state.update(busy=False,activity='idle')
+                self._state['account_test']={'busy':False,'ok':False,'message':'后台启动失败，请检查运行环境。'}
+                self._touch()
+                return {'ok':False,'message':'后台启动失败，请检查运行环境。'}
 
     def start_model_tool(self,kind,value):
         with self._lock:
@@ -176,7 +201,7 @@ class Bridge:
                 elif action=='load':
                     # 未保存的表单配置也可用于本次登录。
                     config=self._normalize(command.get('config',self._config))
-                    if self._process:
+                    if self._process and self._state['connected']:
                         self._notice('重新获取会关闭当前浏览器，请先处理网页中尚未提交的答案。',action=lambda:self._load(config),label='重新获取')
                     else: self._load(config)
                 elif action=='run': self._prepare_run(command)
@@ -207,7 +232,7 @@ class Bridge:
         self._state['task']=None
         self._config=config
         self._session=copy.deepcopy(config)
-        self._state.update(papers=[],busy=True,activity='loading',completed=False,page='papers',status='正在登录并获取试卷…',progress=None)
+        self._state.update(papers=[],connected=False,busy=True,activity='loading',completed=False,page='papers',status='正在登录并获取试卷…',progress=None)
         self._clear_notice()
         try: self._send({'action':'load','config':config})
         except Exception:
@@ -254,7 +279,6 @@ class Bridge:
                 env={**os.environ,'PYTHONIOENCODING':'utf-8'},creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
             threading.Thread(target=self._read,args=(self._process,),daemon=True).start()
         self._process.stdin.write(json.dumps(command,ensure_ascii=False)+'\n'); self._process.stdin.flush()
-        self._state['connected']=True
 
     def _read(self,process):
         try:
@@ -279,9 +303,17 @@ class Bridge:
                     self._state['task']=self._task.snapshot()
                 ratio=re.search(r'(\d+)/(\d+)',message)
                 self._state['progress']=min(100,int(ratio[1])*100/int(ratio[2])) if ratio and int(ratio[2]) else None
+            elif kind=='account-test':
+                current=self._state['account_test']
+                if event.get('request_id')==current.get('request_id'):
+                    self._state['account_test']={k:event[k] for k in ('ok','message','request_id')}
+                    self._state['account_test']['busy']=False
+                    self._state.update(busy=False,activity='idle',status='iTEST 登录测试通过' if event.get('ok') else 'iTEST 登录测试未通过')
             elif kind=='papers':
-                self._state.update(papers=event['papers'],busy=False,activity='idle',status=f'已获取 {len(event["papers"])} 张试卷',completed=False)
+                self._state.update(papers=event['papers'],connected=True,busy=False,activity='idle',status=f'已获取 {len(event["papers"])} 张试卷',completed=False)
             elif kind in ('done','error'):
+                if self._state['account_test'].get('busy'):
+                    self._state['account_test'].update(busy=False,ok=False,message='登录测试中断，请检查网络和浏览器后重试。')
                 self._state.update(busy=False,activity='idle',completed=True,progress=None)
                 if isinstance(event.get('papers'),list):
                     self._state['papers']=event['papers']
@@ -302,6 +334,8 @@ class Bridge:
                 self._state['logs']=(self._state['logs']+[self._redact(text)])[-600:]
                 self._notice(text,kind=='error')
             elif kind=='exit':
+                if self._state['account_test'].get('busy'):
+                    self._state['account_test'].update(busy=False,ok=False,message='测试后台已退出，请重试。')
                 if self._task and self._task.value['status']=='running':
                     self._task.fail('后台意外退出，请查看日志和网页。')
                     self._state['task']=self._task.snapshot()
@@ -361,6 +395,8 @@ class Bridge:
                     self._task.fail('任务已由你停止，已填写或提交的答案不会撤销。',stopped=True)
                     self._state['task']=self._task.snapshot()
                 self._state.update(stopping=False,busy=False,activity='idle',connected=False,papers=[],completed=False,status='已停止')
+                if self._state['account_test'].get('busy'):
+                    self._state['account_test'].update(busy=False,ok=False,message='登录测试已停止。')
                 self._touch()
                 should_close=close or self._close_after_stop
             if should_close: self._destroy_window()

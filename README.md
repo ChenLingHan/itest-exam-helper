@@ -4,7 +4,7 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 
 ## 下载安装
 
-在 [Releases](https://github.com/ChenLingHan/iTEST-exam-helper/releases/tag/v1.1.0-beta.3) 下载 `iTEST-Exam-Helper-1.1.0-beta.3-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
+在 [Releases](https://github.com/ChenLingHan/iTEST-exam-helper/releases/tag/v1.1.0-beta.4) 下载 `iTEST-Exam-Helper-1.1.0-beta.4-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
 
 - 支持 Windows 10/11 64 位（x64），无需安装 Python 或手动安装依赖。
 - 内置英语离线语音模型及 FFmpeg。
@@ -23,9 +23,13 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 本版通过合成页面及已有听力页面离线验证，尚未验证各类真实试卷的完整流程，不能承诺覆盖所有考试。口语录音、图片/视频题、富文本编辑器以及不认识的控件会停止处理；新页面结构需继续适配。默认不自动交卷。
 模型生成的答案可能有误，应自行复核；使用模型服务可能产生费用。请仅在获得授权的场景使用。
 
-模型设置采用连接管理方式：按官方服务、聚合平台和自定义分类搜索，提供 OpenRouter、硅基流动等聚合平台。同一服务商可保存多个独立命名的连接；每套连接保留自己的密钥、接口和模型。预设只填写起始值，地址和模型均可修改。旧配置自动迁入“原有模型配置”。
+模型设置采用连接管理方式：内置服务商精简为 DeepSeek、OpenAI、GLM 和 Kimi，另保留自定义接口供旧连接继续使用。同一服务商可保存多个独立命名的连接；每套连接保留自己的密钥、接口和模型。预设只填写起始值，地址和模型均可修改。旧配置自动迁入“原有模型配置”。
 
-点击“获取模型列表”可查询平台的模型 ID，也可手动输入；平台列表不保证每个模型都支持文本对话和 JSON 输出。点击“测试连接”会发送一条简短 JSON 请求，可能消耗少量 Token。保存和切换不会自动调用模型。连接测试只验证当前接口与模型的兼容性，不代表答题准确率。参考来源及协议边界见 [模型连接说明](MODEL_PRESETS.md)。
+点击“获取模型列表”后显示全部返回模型，并可用独立搜索框筛选；当前已选模型不会过滤其他选项。也可手动输入模型 ID；平台列表不保证每个模型都支持文本对话和 JSON 输出。点击“测试连接”会发送一条简短 JSON 请求，可能消耗少量 Token。保存和切换不会自动调用模型。连接测试只验证当前接口与模型的兼容性，不代表答题准确率。参考来源及协议边界见 [模型连接说明](MODEL_PRESETS.md)。
+
+首次启动未配置账号时自动打开设置页。填写账号和密码后，可点击“测试 iTEST 登录”：程序打开独立浏览器，登录并读取列表验证权限，不进入考试，不保存本次未保存的测试密码。遇到验证码可在测试浏览器中完成；可停止测试。
+
+默认窗口最大为 1120×820，并按 Windows 工作区与缩放比例缩小以适应屏幕。
 
 ## 本地数据与隐私
 
@@ -60,7 +64,7 @@ Copy-Item config.example.yml config.yml
 在 Windows x64 上使用 Python 3.13、锁定依赖及 Inno Setup 6.7.3：
 
 ```powershell
-python -m unittest test_gui test_task_progress test_release test_exam_schema test_model_presets test_model_connections
+python -m unittest test_gui test_task_progress test_release test_exam_schema test_model_presets test_model_connections test_account_check
 New-Item -ItemType Directory -Force .release-tools
 Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile .release-tools/MicrosoftEdgeWebview2Setup.exe
 .\build_release.ps1 -ISCC 'C:\path\to\ISCC.exe'

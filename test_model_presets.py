@@ -8,6 +8,9 @@ from model_presets import get_presets, normalize_ai, infer_provider, request_opt
 
 
 class ModelPresetTests(unittest.TestCase):
+    def test_catalog_has_only_the_four_requested_providers(self):
+        self.assertEqual({p['id'] for p in get_presets()},{'deepseek','openai','zhipu','kimi'})
+
     def test_key_only_presets_have_canonical_endpoint_and_model(self):
         for preset in get_presets():
             with self.subTest(provider=preset['id']):

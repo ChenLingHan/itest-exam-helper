@@ -1,15 +1,13 @@
 # 模型服务预设
 
-核对日期：2026-10-28。选择服务商即可自动填写接口地址和模型；只需填写该平台的 API Key。已有配置保持原值，不自动迁移到新模型。新服务商初始 Key 为空；来回切换会恢复各自的草稿，不会跨平台沿用同一个 Key。
+核对日期：2026-10-28。当前内置服务商仅为 DeepSeek、OpenAI、GLM 和 Kimi。选择服务商即可自动填写接口地址和模型；只需填写该平台的 API Key。已有配置保持原值，不自动迁移到新模型。新服务商初始 Key 为空；来回切换会恢复各自的草稿，不会跨平台沿用同一个 Key。
 
 | 预设 | 默认模型 | 官方依据 |
 | --- | --- | --- |
 | DeepSeek | deepseek-flash | [快速开始](https://api-docs.deepseek.com/)、[JSON 输出](https://api-docs.deepseek.com/guides/json_mode/) |
-| 通义千问（北京/新加坡） | qwen-plus | [OpenAI 兼容接口](https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope)、[思考参数与模型](https://help.aliyun.com/zh/model-studio/deep-thinking) |
 | Kimi | kimi-k2.6 | [快速开始](https://platform.kimi.com/docs/get-api-key)、[K2.6](https://platform.kimi.com/docs/guide/kimi-k2-6-quickstart) |
 | 智谱 GLM | glm-5.2 | [OpenAI 兼容接口](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) |
 | OpenAI | gpt-4.1-mini | [模型说明](https://developers.openai.com/api/docs/models/gpt-4.1-mini) |
-| Google Gemini | gemini-3.8-flash | [OpenAI 兼容接口](https://ai.google.dev/gemini-api/docs/openai/) |
 
 默认优先采用可关闭思考、适合结构化输出的配置；不代表各平台最新或最强模型。百炼预设使用官方仍支持的公共域名，不需要额外填写业务空间 ID；Key 必须与北京/新加坡地域匹配。Google 等服务还需要可达的网络及可用地域。订阅产品（例如 ChatGPT、Kimi Code、GLM Coding Plan）不等同于这里使用的通用 API Key。
 
@@ -28,3 +26,10 @@
 - 当前支持 OpenAI Chat Completions 兼容协议。CC Switch 中的 OAuth 登录、Coding Plan 特定协议及原生 Anthropic/Responses 路由没有照搬为可用功能。
 
 以上是交互和接口格式验证，未以真实密钥对所有平台进行计费调用。
+
+
+## v1.1.0-beta.4 调整
+
+当前内置目录仅显示 DeepSeek、OpenAI、智谱 GLM 和 Kimi。之前其他平台的连接不删除，在界面作为自定义接口继续编辑。历史预设表用于解释已保存旧配置，不表示当前仍推荐这些平台。
+
+模型选择使用应用内完整列表：从平台获取的数据逐项显示，当前输入值不用于隐式过滤。需要筛选时在独立搜索框输入；修改接口或 API Key 会清掉旧结果，过期请求结果不会应用到新连接。[DeepSeek 模型列表接口](https://api-docs.deepseek.com/api/list-models/)可能只返回少数可用模型，程序以真实返回值为准，不补造模型名称。

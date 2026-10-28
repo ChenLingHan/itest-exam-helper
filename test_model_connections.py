@@ -87,6 +87,9 @@ class ConnectionTests(unittest.TestCase):
         with patch('openai.OpenAI',return_value=client):
             self.assertEqual(model_tool(ai(),'models')['models'],['a','b'])
             client.chat.completions.create.assert_not_called()
+            client.models.list.return_value.data=[]
+            empty=model_tool(ai(),'models')
+            self.assertFalse(empty['ok']);self.assertEqual(empty['models'],[])
             self.assertTrue(model_tool(ai(),'test')['ok'])
             self.assertEqual(client.chat.completions.create.call_args.kwargs['response_format'],{'type':'json_object'})
         self.assertEqual(tool_error(types.SimpleNamespace(status_code=401)),'鉴权失败：请检查 API Key、所属地域及模型权限。')

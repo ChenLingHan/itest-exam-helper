@@ -26,6 +26,22 @@ def refresh_papers(runner):
             runner.driver.switch_to.window(original)
 
 
+def check_account(config, runner_factory):
+    """Authenticate and read the list only; never enter or submit an exam."""
+    probe=runner_factory(config)
+    try:
+        probe.start()
+        probe.login(timeout=90)
+        papers=probe.papers()
+        return {'ok':True,'message':f'登录测试通过，可读取试卷列表（{len(papers)} 张）。'}
+    except Exception:
+        return {'ok':False,'message':'登录测试未通过。请检查账号密码、网页验证码、Edge 驱动和网络连接，然后重试。'}
+    finally:
+        if probe.driver:
+            try: probe.driver.quit()
+            except Exception: pass
+
+
 def main():
     from exam_runner import ExamRunner, ListeningSolver, ROOT, parse_groups
 
@@ -40,7 +56,9 @@ def main():
         for line in sys.stdin:
             command = json.loads(line)
             try:
-                if command["action"] == "load":
+                if command["action"] == "check_login":
+                    emit('account-test',request_id=command['request_id'],**check_account(command['config'],ExamRunner))
+                elif command["action"] == "load":
                     if runner and runner.driver:
                         runner.driver.quit()
                     runner = ExamRunner(command["config"])

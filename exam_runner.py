@@ -172,8 +172,8 @@ class ExamRunner:
             options.add_argument("--headless=new")
         options.add_argument("--window-size=1440,1000")
         options.add_argument("--disable-features=msImportBrowserData")
-        path = RESOURCE_ROOT / "edgedriver.exe"
-        service = Service(str(path)) if path.exists() else Service()
+        # Match the installed Edge version, including source runs with an old bundled driver.
+        service = Service()
         try:
             self.driver = webdriver.Edge(service=service, options=options)
         except Exception as error:
@@ -182,10 +182,10 @@ class ExamRunner:
         self.driver.set_script_timeout(30)
         self.driver.implicitly_wait(0)
 
-    def login(self):
+    def login(self, timeout=25):
         LOG.info("正在登录 iTEST...")
         self.driver.get("https://sso.unipus.cn/sso/login?service=https%3A%2F%2Fitestcloud.unipus.cn%2Futest%2Fitest%2Flogin")
-        wait = WebDriverWait(self.driver, 25)
+        wait = WebDriverWait(self.driver, timeout)
         wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, "input[name='username']"))).send_keys(self.config["username"])
         self.driver.find_element(By.CSS_SELECTOR, "input[name='password']").send_keys(self.config["password"])
         checkbox = self.driver.find_element(By.CSS_SELECTOR, ".help-block input[type='checkbox']")

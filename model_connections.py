@@ -96,7 +96,7 @@ def model_tool(ai,kind):
         if kind=='models':
             page=client.models.list()
             models=sorted({m.id for m in page.data if isinstance(m.id,str) and 0<len(m.id)<=256})[:5000]
-            return {'ok':True,'models':models,'message':f'已获取 {len(models)} 个模型；请选择支持文本对话和 JSON 输出的模型。'}
+            return {'ok':bool(models),'models':models,'message':f'已获取 {len(models)} 个模型；请在完整列表中选择或单独搜索。' if models else '平台返回的模型列表为空，请检查账号权限，或手动填写模型 ID。'}
         if kind!='test':
             raise ValueError('不支持的模型检查操作。')
         response=client.chat.completions.create(model=ai['model'],messages=[

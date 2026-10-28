@@ -6,7 +6,7 @@ import yaml
 ROOT = Path(__file__).resolve().parent
 DEST = ROOT / 'publish'
 FILES = ['app_paths.py', 'desktop_bridge.py', 'exam_runner.py', 'gui.py', 'gui_worker.py',
-         'model_connections.py', 'test_model_connections.py', 'model_presets.py', 'test_model_presets.py', 'MODEL_PRESETS.md', 'exam_schema.py', 'test_exam_schema.py', 'task_progress.py', 'itest.py', 'kimi_model.py', 'main.py', 'mp32str.py',
+         'model_connections.py', 'test_model_connections.py', 'test_account_check.py', 'model_presets.py', 'test_model_presets.py', 'MODEL_PRESETS.md', 'exam_schema.py', 'test_exam_schema.py', 'task_progress.py', 'itest.py', 'kimi_model.py', 'main.py', 'mp32str.py',
          'test_gui.py', 'test_task_progress.py', 'test_desktop_ui.py', 'test_close_ui.py',
          'requirements.txt', 'requirements-gui.txt', 'requirements-lock.txt',
          'README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'config.example.yml',

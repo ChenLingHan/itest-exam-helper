@@ -23,7 +23,7 @@ for _preset in PRESETS:
 
 
 def get_presets():
-    return deepcopy(PRESETS)
+    return deepcopy([p for p in PRESETS if p['id'] in ('deepseek','openai','zhipu','kimi')])
 
 
 def infer_provider(ai):

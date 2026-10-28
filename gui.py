@@ -10,6 +10,29 @@ from app_paths import RESOURCE_ROOT
 ROOT=RESOURCE_ROOT
 
 
+def initial_window_size(work_width=1440,work_height=900):
+    # Logical pixels; leave room for the taskbar, title bar, and window borders.
+    available_width=max(320,int(work_width)-40)
+    available_height=max(320,int(work_height)-60)
+    width=min(1120,available_width)
+    height=min(820,available_height)
+    return width,height,(min(680,width),min(480,height))
+
+
+def screen_work_area():
+    if os.name=='nt':
+        try:
+            import ctypes
+            from ctypes import wintypes
+            rect=wintypes.RECT()
+            if ctypes.windll.user32.SystemParametersInfoW(48,0,ctypes.byref(rect),0):
+                try: scale=ctypes.windll.user32.GetDpiForSystem()/96
+                except Exception: scale=1
+                return (rect.right-rect.left)/scale,(rect.bottom-rect.top)/scale
+        except Exception: pass
+    return 1440,900
+
+
 def main():
     import webview
     if os.name=='nt':
@@ -24,7 +47,8 @@ def main():
     logo=base64.b64encode((ROOT/'assets'/'itest-icon-32.png').read_bytes()).decode()
     html=html.replace('__MODEL_SETTINGS_SCRIPT__',(ROOT/'ui'/'model-settings.js').read_text(encoding='utf-8'))
     html=html.replace('__ITEST_ICON__','data:image/png;base64,'+logo)
-    window=webview.create_window('iTEST',html=html,js_api=api,width=860,height=600,min_size=(680,480),hidden=smoke,
+    width,height,minimum=initial_window_size(*screen_work_area())
+    window=webview.create_window('iTEST',html=html,js_api=api,width=width,height=height,min_size=minimum,hidden=smoke,
         background_color='#ffffff',text_select=True,confirm_close=False)
     api._window=window
     window.events.closing+=api._on_closing
