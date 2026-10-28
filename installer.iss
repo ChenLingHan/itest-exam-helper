@@ -1,4 +1,4 @@
-#define AppVersion "1.1.0-beta.1"
+#define AppVersion "1.1.0-beta.2"
 [Setup]
 AppId={{961BA730-F384-44E9-A737-EB1606BC8A87}
 AppName=iTEST Exam Helper

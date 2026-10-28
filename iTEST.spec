@@ -1,11 +1,18 @@
 # Build both executables against the same bundled dependencies.
-from PyInstaller.utils.hooks import collect_all, collect_data_files
+from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
 datas = [('ui', 'ui'), ('assets', 'assets'), ('model', 'model'),
          ('lib/ffmpeg.exe', 'lib'), ('LICENSE', '.'),
          ('THIRD_PARTY_NOTICES.md', '.'), ('config.example.yml', '.')]
 binaries = []
-hiddenimports = ['webview.platforms.edgechromium', 'webview.platforms.winforms']
+# Selenium 4.51 exposes drivers through importlib-based lazy imports.
+# Include every webdriver module and the native Selenium Manager explicitly.
+hiddenimports = ['webview.platforms.edgechromium', 'webview.platforms.winforms'] + collect_submodules('selenium')
+datas += collect_data_files('selenium', includes=['webdriver/remote/*.js', 'webdriver/common/*NOTICES*'])
+from pathlib import Path
+import selenium
+manager = Path(selenium.__file__).parent / 'webdriver/common/windows/selenium-manager.exe'
+binaries.append((str(manager), 'selenium/webdriver/common/windows'))
 for package in ('vosk', 'webview', 'clr_loader', 'pythonnet'):
     d, b, h = collect_all(package)
     datas += d

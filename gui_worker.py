@@ -92,8 +92,26 @@ if __name__ == "__main__":
     try:
         os.chdir(RESOURCE_ROOT)
         DATA_ROOT.mkdir(parents=True, exist_ok=True)
+        if '--browser-test' in sys.argv:
+            from exam_runner import ExamRunner
+            runner = ExamRunner({}, headless=True)
+            try:
+                runner.start()
+                runner.driver.get('data:text/html,<title>iTEST browser test</title>')
+                assert runner.driver.title == 'iTEST browser test'
+                emit('browser-test', version=VERSION, ok=True)
+            finally:
+                if runner.driver:
+                    runner.driver.quit()
+            raise SystemExit(0)
         if '--self-test' in sys.argv:
             import openai, selenium, yaml, parsel, webview
+            # Access the lazy driver imports, not just the selenium package.
+            from selenium import webdriver
+            from selenium.webdriver.common.selenium_manager import SeleniumManager
+            options = webdriver.EdgeOptions()
+            options.add_argument('--headless=new')
+            assert webdriver.Edge and SeleniumManager._get_binary().is_file()
             from vosk import Model, SetLogLevel
             from exam_runner import ListeningSolver
             SetLogLevel(-1)

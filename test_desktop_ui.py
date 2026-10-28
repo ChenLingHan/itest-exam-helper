@@ -42,6 +42,11 @@ def check(window,bridge):
         assert window.evaluate_js("document.querySelector('#page-settings').classList.contains('active')"), '设置页未切换'
         assert window.evaluate_js("document.querySelector('#page-settings .content').scrollHeight>=document.querySelector('#page-settings .content').clientHeight"), '设置页滚动异常'
         assert window.evaluate_js("document.querySelectorAll('input[type=password]').length===2"), '密码与密钥未遮蔽'
+        assert window.evaluate_js("document.querySelector('#provider').options.length===8 && document.querySelector('#provider').value==='custom'"), '预设列表或旧配置识别错误'
+        window.evaluate_js("document.querySelector('#apikey').value='private-test-key';document.querySelector('#provider').value='qwen-cn';document.querySelector('#provider').dispatchEvent(new Event('change'))")
+        assert window.evaluate_js("document.querySelector('#apikey').value==='' && document.querySelector('#base_url').value==='https://dashscope.aliyuncs.com/compatible-mode/v1' && document.querySelector('#model').value==='qwen-plus' && document.querySelector('#model').readOnly"), '切换服务商未正确配置或未清除旧密钥'
+        window.evaluate_js("document.querySelector('#provider').value='custom';document.querySelector('#provider').dispatchEvent(new Event('change'))")
+        assert window.evaluate_js("!document.querySelector('#model').readOnly && document.querySelector('#advanced').open"), '无法使用自定义接口'
         assert bridge._pending is None
         bridge._task=TaskProgress({'ksdId':'123','ksName':'离线进度检查'},True)
         bridge._task.consume('共 6 组、25 道题，需处理 33 份有效录音。')

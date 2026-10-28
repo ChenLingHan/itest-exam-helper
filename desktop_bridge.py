@@ -10,6 +10,7 @@ import sys
 import threading
 import yaml
 from task_progress import TaskProgress
+from model_presets import get_presets, normalize_ai, infer_provider
 from app_paths import DATA_ROOT, RESOURCE_ROOT, worker_command
 
 ROOT = DATA_ROOT
@@ -46,7 +47,7 @@ class Bridge:
         self._allow_close=False
         self._close_after_stop=False
         self._task=None
-        self._config={'username':'','password':'','sleep_time':10,'ai':{'base_url':'https://api.deepseek.com/v1','model':'deepseek-chat','apikey':''}}
+        self._config={'username':'','password':'','sleep_time':10,'ai':{'provider':'deepseek','base_url':'https://api.deepseek.com','model':'deepseek-flash','apikey':''}}
         self._state={'version':0,'activity':'idle','busy':False,'stopping':False,'connected':False,'papers':[],
             'logs':[],'status':'准备就绪','notice':None,'progress':None,'task':None,'page':'papers','completed':False,'blocked_paper_ids':[]}
         try:
@@ -56,12 +57,17 @@ class Bridge:
                 if not isinstance(value,dict) or not isinstance(value.get('ai',{}),dict): raise ValueError()
                 self._config.update({k:v for k,v in value.items() if k!='ai'})
                 self._config['ai'].update(value.get('ai',{}))
+                # Older configurations keep their endpoint/model unchanged.
+                self._config['ai']['provider']=value.get('ai',{}).get('provider',infer_provider(self._config['ai']))
         except Exception:
             self._state['page']='settings'
             self._notice('配置文件未能读取，请检查 config.yml 或重新填写设置。',True)
 
     def get_state(self):
         with self._lock: return copy.deepcopy(self._state)
+
+    def get_model_presets(self):
+        return get_presets()
 
     def get_config(self):
         with self._lock: return copy.deepcopy(self._config)
@@ -127,6 +133,9 @@ class Bridge:
         config=copy.deepcopy(self._config)
         config.update({k:v for k,v in value.items() if k!='ai'})
         config['ai'].update(value.get('ai',{}))
+        if 'provider' not in value.get('ai',{}):
+            config['ai']['provider']=infer_provider(config['ai'])
+        config['ai']=normalize_ai(config['ai'])
         for key in ('username','password'):
             if not isinstance(config[key],str): raise ValueError('账号与密码格式错误。')
         for key in ('base_url','model','apikey'):
@@ -152,7 +161,7 @@ class Bridge:
         if not self._process or not self._state['connected']: raise ValueError('请先获取试卷。')
         validate_config(self._session,True)
         # 表单修改后要求重新登录，以免实际使用旧的模型或账号。
-        if self._normalize(command.get('config',self._config))!=self._session:
+        if self._normalize(command.get('config',self._config))!=self._normalize(self._session):
             raise ValueError('设置已修改，请重新获取试卷。')
         index=command.get('index')
         if not isinstance(index,int) or isinstance(index,bool) or not 0<=index<len(self._state['papers']):

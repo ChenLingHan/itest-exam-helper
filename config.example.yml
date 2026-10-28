@@ -2,6 +2,7 @@ username: ""
 password: ""
 sleep_time: 10
 ai:
-  base_url: "https://api.deepseek.com/v1"
-  model: "deepseek-chat"
+  provider: "deepseek"
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-flash"
   apikey: ""

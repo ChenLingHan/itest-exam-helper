@@ -12,9 +12,14 @@ New-Item -ItemType Directory -Force $licenses | Out-Null
 python -c "import importlib.metadata as m,pathlib,shutil; root=pathlib.Path('$licenses'); [( (root/d.metadata['Name']/str(f)).parent.mkdir(parents=True,exist_ok=True),shutil.copyfile(d.locate_file(f),root/d.metadata['Name']/str(f))) for d in m.distributions() for f in (d.files or []) if ('license' in str(f).lower() or 'copying' in str(f).lower()) and d.locate_file(f).is_file()]"
 & 'dist/iTEST/iTEST-worker.exe' --self-test
 if ($LASTEXITCODE -ne 0) { throw 'Frozen runtime self-test failed' }
+& 'dist/iTEST/iTEST-worker.exe' --browser-test
+if ($LASTEXITCODE -ne 0) { throw 'Frozen Edge browser test failed' }
 & $ISCC installer.iss
 if ($LASTEXITCODE -ne 0) { throw 'Installer compilation failed' }
-Get-ChildItem release/*.exe | ForEach-Object {
+$releaseVersion = python -c "from app_paths import VERSION; print(VERSION)"
+$sums = Get-Item "release/iTEST-Exam-Helper-$releaseVersion-windows-x64-setup.exe" | ForEach-Object {
     $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-    "$hash  $($_.Name)" | Set-Content -Encoding ascii release/SHA256SUMS.txt
+    "$hash  $($_.Name)"
 }
+
+$sums | Set-Content -Encoding ascii release/SHA256SUMS.txt
