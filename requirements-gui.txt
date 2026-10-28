@@ -1,0 +1,8 @@
+# 新版引擎及桌面界面所需依赖
+requests>=2.32,<3
+selenium>=4.29,<5
+parsel>=1.10,<2
+openai>=1.66.5,<2
+vosk>=0.3.45,<0.4
+PyYAML>=6.0.2,<7
+pywebview>=6.2,<7

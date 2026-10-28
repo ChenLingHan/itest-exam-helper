@@ -1,0 +1,41 @@
+name: Windows release
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - run: python -m pip install -r requirements-lock.txt
+      - run: python -m unittest test_gui test_task_progress test_release
+      - name: Obtain public runtime resources
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force .release-tools,lib | Out-Null
+          Invoke-WebRequest https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip -OutFile .release-tools/model.zip
+          Expand-Archive .release-tools/model.zip .release-tools/model
+          Copy-Item .release-tools/model/vosk-model-small-en-us-0.15 model -Recurse
+          Invoke-WebRequest https://github.com/GyanD/codexffmpeg/releases/download/7.1.1/ffmpeg-7.1.1-essentials_build.zip -OutFile .release-tools/ffmpeg.zip
+          Expand-Archive .release-tools/ffmpeg.zip .release-tools/ffmpeg
+          Get-ChildItem .release-tools/ffmpeg -Recurse -Filter ffmpeg.exe | Select-Object -First 1 | Copy-Item -Destination lib/ffmpeg.exe
+          Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile .release-tools/MicrosoftEdgeWebview2Setup.exe
+      - name: Build installer
+        shell: pwsh
+        run: ./build_release.ps1 -ISCC 'C:/Program Files (x86)/Inno Setup 6/ISCC.exe'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iTEST-windows-x64
+          path: release/*
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create ${{ github.ref_name }} release/* --title 'iTEST Exam Helper ${{ github.ref_name }}' --notes-file RELEASE_NOTES.md

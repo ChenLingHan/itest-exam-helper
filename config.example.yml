@@ -1,0 +1,7 @@
+username: ""
+password: ""
+sleep_time: 10
+ai:
+  base_url: "https://api.deepseek.com/v1"
+  model: "deepseek-chat"
+  apikey: ""
