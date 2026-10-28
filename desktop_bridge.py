@@ -100,18 +100,21 @@ class Bridge:
             except Exception:
                 return {'ok':False,'message':'连接保存失败，原配置仍保留，请检查本地数据目录。'}
 
-    def start_account_test(self,value):
+    def start_browser_test(self):
+        return self.start_account_test({},browser_only=True)
+
+    def start_account_test(self,value,browser_only=False):
         with self._lock:
             try:
                 if self._state['busy']: raise ValueError('请等待当前任务结束。')
-                if not isinstance(value,dict) or not isinstance(value.get('username'),str) or not isinstance(value.get('password'),str):
+                if not isinstance(value,dict) or (not browser_only and (not isinstance(value.get('username'),str) or not isinstance(value.get('password'),str))):
                     raise ValueError('请填写 iTEST 账号和密码。')
-                config={'username':value['username'].strip(),'password':value['password'],'sleep_time':0}
-                if not config['username'] or not config['password']: raise ValueError('请填写 iTEST 账号和密码。')
+                config={} if browser_only else {'username':value['username'].strip(),'password':value['password'],'sleep_time':0}
+                if not browser_only and (not config['username'] or not config['password']): raise ValueError('请填写 iTEST 账号和密码。')
                 request_id=uuid.uuid4().hex
-                self._state['account_test']={'busy':True,'request_id':request_id}
-                self._state.update(busy=True,activity='account-test',page='settings',status='正在测试 iTEST 登录；如有验证码，请在测试浏览器中完成。')
-                self._send({'action':'check_login','config':config,'request_id':request_id})
+                self._state['account_test']={'busy':True,'request_id':request_id,'browser_only':browser_only}
+                self._state.update(busy=True,activity='account-test',page='settings',status='正在检查 Edge 启动，无需账号密码…' if browser_only else '正在测试 iTEST 登录；如有验证码，请在测试浏览器中完成。')
+                self._send({'action':'check_browser' if browser_only else 'check_login','config':config,'request_id':request_id})
                 self._touch()
                 return {'ok':True,'request_id':request_id}
             except ValueError as error:
@@ -275,10 +278,10 @@ class Bridge:
     def _send(self,command):
         if self._process is None or self._process.poll() is not None:
             self._process=subprocess.Popen(worker_command(),cwd=RESOURCE_ROOT,
-                stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf-8',
+                stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf-8',errors='replace',
                 env={**os.environ,'PYTHONIOENCODING':'utf-8'},creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
             threading.Thread(target=self._read,args=(self._process,),daemon=True).start()
-        self._process.stdin.write(json.dumps(command,ensure_ascii=False)+'\n'); self._process.stdin.flush()
+        self._process.stdin.write(json.dumps(command,ensure_ascii=True)+'\n'); self._process.stdin.flush()
 
     def _read(self,process):
         try:
@@ -306,9 +309,9 @@ class Bridge:
             elif kind=='account-test':
                 current=self._state['account_test']
                 if event.get('request_id')==current.get('request_id'):
-                    self._state['account_test']={k:event[k] for k in ('ok','message','request_id')}
+                    self._state['account_test']={**current,**{k:event[k] for k in ('ok','message','request_id')}}
                     self._state['account_test']['busy']=False
-                    self._state.update(busy=False,activity='idle',status='iTEST 登录测试通过' if event.get('ok') else 'iTEST 登录测试未通过')
+                    self._state.update(busy=False,activity='idle',status=event.get('message','检查已结束'))
             elif kind=='papers':
                 self._state.update(papers=event['papers'],connected=True,busy=False,activity='idle',status=f'已获取 {len(event["papers"])} 张试卷',completed=False)
             elif kind in ('done','error'):

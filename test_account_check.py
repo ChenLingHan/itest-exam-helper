@@ -6,9 +6,21 @@ from unittest.mock import MagicMock, patch
 from desktop_bridge import Bridge
 from gui_worker import check_account
 from gui import initial_window_size
+from browser_startup import BrowserStartError
 
 
 class AccountCheckTests(unittest.TestCase):
+    def test_browser_check_needs_no_credentials_and_never_logs_in(self):
+        runner=MagicMock();runner.driver.title='iTEST browser check'
+        self.assertTrue(check_account({},lambda _:runner,browser_only=True)['ok'])
+        runner.login.assert_not_called();runner.papers.assert_not_called();runner.enter.assert_not_called()
+        runner.driver.quit.assert_called_once()
+
+    def test_specific_browser_errors_reach_the_ui(self):
+        runner=MagicMock();runner.start.side_effect=BrowserStartError('匹配 Edge 驱动超时')
+        result=check_account({},lambda _:runner,browser_only=True)
+        self.assertIn('驱动超时',result['message']);self.assertFalse(result['ok'])
+
     def test_success_with_empty_exam_list_does_not_enter_exam(self):
         runner=MagicMock();runner.papers.return_value=[]
         factory=MagicMock(return_value=runner)

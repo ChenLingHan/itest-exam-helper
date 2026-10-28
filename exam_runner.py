@@ -18,6 +18,7 @@ import requests
 import yaml
 from app_paths import DATA_ROOT, RESOURCE_ROOT
 from model_presets import normalize_ai, request_options
+from browser_startup import start_edge
 from parsel import Selector
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchWindowException, TimeoutException, WebDriverException
@@ -167,17 +168,7 @@ class ExamRunner:
         self.list_window = None
 
     def start(self):
-        options = webdriver.EdgeOptions()
-        if self.headless:
-            options.add_argument("--headless=new")
-        options.add_argument("--window-size=1440,1000")
-        options.add_argument("--disable-features=msImportBrowserData")
-        # Match the installed Edge version, including source runs with an old bundled driver.
-        service = Service()
-        try:
-            self.driver = webdriver.Edge(service=service, options=options)
-        except Exception as error:
-            raise RunError("Edge 启动失败，请确认已安装 Microsoft Edge 且网络允许下载对应驱动，然后重试。") from error
+        self.driver = start_edge(headless=self.headless)
         self.driver.set_page_load_timeout(40)
         self.driver.set_script_timeout(30)
         self.driver.implicitly_wait(0)

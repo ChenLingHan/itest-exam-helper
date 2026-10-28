@@ -4,7 +4,7 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 
 ## 下载安装
 
-在 [Releases](https://github.com/ChenLingHan/iTEST-exam-helper/releases/tag/v1.1.0-beta.4) 下载 `iTEST-Exam-Helper-1.1.0-beta.4-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
+在 [Releases](https://github.com/ChenLingHan/iTEST-exam-helper/releases/tag/v1.1.0-beta.5) 下载 `iTEST-Exam-Helper-1.1.0-beta.5-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
 
 - 支持 Windows 10/11 64 位（x64），无需安装 Python 或手动安装依赖。
 - 内置英语离线语音模型及 FFmpeg。
@@ -27,7 +27,9 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 
 点击“获取模型列表”后显示全部返回模型，并可用独立搜索框筛选；当前已选模型不会过滤其他选项。也可手动输入模型 ID；平台列表不保证每个模型都支持文本对话和 JSON 输出。点击“测试连接”会发送一条简短 JSON 请求，可能消耗少量 Token。保存和切换不会自动调用模型。连接测试只验证当前接口与模型的兼容性，不代表答题准确率。参考来源及协议边界见 [模型连接说明](MODEL_PRESETS.md)。
 
-首次启动未配置账号时自动打开设置页。填写账号和密码后，可点击“测试 iTEST 登录”：程序打开独立浏览器，登录并读取列表验证权限，不进入考试，不保存本次未保存的测试密码。遇到验证码可在测试浏览器中完成；可停止测试。
+首次启动未配置账号时自动打开设置页。浏览器没有打开时，可先点击不需要账号的“检查浏览器”。程序分阶段显示驱动准备和 Edge 启动进度，驱动下载网络超时为 25 秒，常规管理进程最多等待 45 秒；如果管理器读取微软 ZIP 下载响应失败，会从同一微软地址再试一次，重试最多约 60 秒，成功后校验版本并缓存；控制本地驱动的连接会绕过系统代理变量，网页和模型网络设置不变。
+
+填写账号和密码后，可点击“测试 iTEST 登录”：程序打开独立浏览器，登录并读取列表验证权限，不进入考试，不保存本次未保存的测试密码。遇到验证码可在测试浏览器中完成；可停止测试。
 
 默认窗口最大为 1120×820，并按 Windows 工作区与缩放比例缩小以适应屏幕。
 
@@ -64,7 +66,7 @@ Copy-Item config.example.yml config.yml
 在 Windows x64 上使用 Python 3.13、锁定依赖及 Inno Setup 6.7.3：
 
 ```powershell
-python -m unittest test_gui test_task_progress test_release test_exam_schema test_model_presets test_model_connections test_account_check
+python -m unittest test_gui test_task_progress test_release test_exam_schema test_model_presets test_model_connections test_account_check test_browser_startup
 New-Item -ItemType Directory -Force .release-tools
 Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile .release-tools/MicrosoftEdgeWebview2Setup.exe
 .\build_release.ps1 -ISCC 'C:\path\to\ISCC.exe'

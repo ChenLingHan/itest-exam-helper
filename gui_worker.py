@@ -4,10 +4,17 @@ import logging
 import sys
 import os
 from app_paths import RESOURCE_ROOT, DATA_ROOT, VERSION
+from browser_startup import BrowserStartError
+
+
+for _stream in (sys.stdin,sys.stdout,sys.stderr):
+    if _stream is not None and hasattr(_stream,'reconfigure'):
+        _stream.reconfigure(encoding='utf-8',errors='replace')
 
 
 def emit(event, **data):
-    print(json.dumps({"event": event, **data}, ensure_ascii=False), flush=True)
+    # ASCII JSON is lossless for Unicode and independent of a frozen app's code page.
+    print(json.dumps({"event": event, **data}, ensure_ascii=True), flush=True)
 
 
 class EventLog(logging.Handler):
@@ -26,14 +33,21 @@ def refresh_papers(runner):
             runner.driver.switch_to.window(original)
 
 
-def check_account(config, runner_factory):
+def check_account(config, runner_factory, browser_only=False):
     """Authenticate and read the list only; never enter or submit an exam."""
     probe=runner_factory(config)
     try:
         probe.start()
+        if browser_only:
+            probe.driver.get('data:text/html,<title>iTEST browser check</title>')
+            if probe.driver.title!='iTEST browser check':
+                raise BrowserStartError('Edge 已打开，但浏览器控制检查未通过。')
+            return {'ok':True,'message':'Edge 启动与控制检查通过，可以继续测试 iTEST 登录。'}
         probe.login(timeout=90)
         papers=probe.papers()
         return {'ok':True,'message':f'登录测试通过，可读取试卷列表（{len(papers)} 张）。'}
+    except BrowserStartError as error:
+        return {'ok':False,'message':str(error)}
     except Exception:
         return {'ok':False,'message':'登录测试未通过。请检查账号密码、网页验证码、Edge 驱动和网络连接，然后重试。'}
     finally:
@@ -56,8 +70,8 @@ def main():
         for line in sys.stdin:
             command = json.loads(line)
             try:
-                if command["action"] == "check_login":
-                    emit('account-test',request_id=command['request_id'],**check_account(command['config'],ExamRunner))
+                if command["action"] in ("check_login","check_browser"):
+                    emit('account-test',request_id=command['request_id'],**check_account(command['config'],ExamRunner,browser_only=command['action']=='check_browser'))
                 elif command["action"] == "load":
                     if runner and runner.driver:
                         runner.driver.quit()
@@ -110,6 +124,10 @@ if __name__ == "__main__":
     try:
         os.chdir(RESOURCE_ROOT)
         DATA_ROOT.mkdir(parents=True, exist_ok=True)
+        if '--protocol-test' in sys.argv:
+            payload=json.loads(sys.stdin.readline())
+            emit('protocol-test',message='中文通信正常',echo=payload.get('probe'))
+            raise SystemExit(0)
         if '--browser-test' in sys.argv:
             from exam_runner import ExamRunner
             runner = ExamRunner({}, headless=True)

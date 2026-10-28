@@ -9,6 +9,14 @@ import app_paths
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_worker_protocol_roundtrips_unicode(self):
+        probe='中文/日本語/é'
+        result=subprocess.run(app_paths.worker_command()+['--protocol-test'],input=json.dumps({'probe':probe},ensure_ascii=False)+'\n',
+                              text=True,encoding='utf-8',capture_output=True,timeout=20)
+        self.assertEqual(result.returncode,0)
+        self.assertEqual(json.loads(result.stdout)['echo'],probe)
+        self.assertTrue(result.stdout.isascii())
+
     def test_frozen_worker_does_not_require_python(self):
         with patch.object(app_paths, 'FROZEN', True), patch.object(sys, 'executable', r'C:\Apps\iTEST.exe'):
             command = app_paths.worker_command()

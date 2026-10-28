@@ -92,6 +92,12 @@ def check(window,bridge):
             time.sleep(.05)
         assert window.evaluate_js("document.querySelector('#accountTestResult').textContent.includes('登录测试通过')"), 'iTEST 登录测试结果未显示'
         assert len(bridge.get_state()['papers'])==2, '登录测试改动了已有试卷列表'
+        window.evaluate_js("document.querySelector('#testBrowser').click()")
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline:
+            if window.evaluate_js("document.querySelector('#accountTestResult').textContent.includes('Edge 启动检查通过')"): break
+            time.sleep(.05)
+        assert window.evaluate_js("document.querySelector('#accountTestResult').textContent.includes('Edge 启动检查通过')"), '独立浏览器检查结果未显示'
         assert bridge._pending is None
         bridge._task=TaskProgress({'ksdId':'123','ksName':'离线进度检查'},True)
         bridge._task.consume('共 6 组、25 道题，需处理 33 份有效录音。')
@@ -161,6 +167,6 @@ if __name__=='__main__':
         html=(ROOT/'ui/index.html').read_text(encoding='utf-8').replace('__MODEL_SETTINGS_SCRIPT__',(ROOT/'ui/model-settings.js').read_text(encoding='utf-8')).replace('__ITEST_ICON__','data:image/png;base64,'+base64.b64encode((ROOT/'assets/itest-icon-32.png').read_bytes()).decode())
         test_width,test_height=map(int,os.environ.get('ITEST_UI_TEST_SIZE','680x480').split('x'))
         window=webview.create_window('iTEST offline UI check',html=html,js_api=bridge,width=test_width,height=test_height,hidden=True)
-        with patch('desktop_bridge.model_tool',return_value={'ok':True,'models':['deepseek-flash','deepseek-v4-pro'],'message':'已获取 2 个模型'}), patch.object(bridge,'_send',side_effect=lambda command: bridge._event(bridge._process,{'event':'account-test','request_id':command['request_id'],'ok':True,'message':'登录测试通过，可读取试卷列表。'}) if command['action']=='check_login' else None):
+        with patch('desktop_bridge.model_tool',return_value={'ok':True,'models':['deepseek-flash','deepseek-v4-pro'],'message':'已获取 2 个模型'}), patch.object(bridge,'_send',side_effect=lambda command: bridge._event(bridge._process,{'event':'account-test','request_id':command['request_id'],'ok':True,'message':'Edge 启动检查通过' if command['action']=='check_browser' else '登录测试通过，可读取试卷列表。'}) if command['action'] in ('check_login','check_browser') else None):
             webview.start(check,(window,bridge),gui='edgechromium',private_mode=True)
     raise SystemExit(bool(errors))

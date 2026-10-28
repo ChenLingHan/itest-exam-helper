@@ -102,8 +102,10 @@ window.ModelSettings = (() => {
     const account=state.account_test||{};
     $('fetchModels').textContent=tool.busy&&tool.kind==='models'?'获取中…':'获取模型列表';
     $('testModel').textContent=tool.busy&&tool.kind==='test'?'检查中…':'测试连接';
-    $('testAccount').disabled=locked&&!account.busy;
-    $('testAccount').textContent=account.busy?'停止登录测试':'测试 iTEST 登录';
+    $('testBrowser').disabled=locked&&!(account.busy&&account.browser_only);
+    $('testBrowser').textContent=account.busy&&account.browser_only?'停止浏览器检查':'检查浏览器';
+    $('testAccount').disabled=locked&&(!account.busy||account.browser_only);
+    $('testAccount').textContent=account.busy&&!account.browser_only?'停止登录测试':'测试 iTEST 登录';
     if(account.request_id===accountRequest&&accountSignature===JSON.stringify(accountValue())&&!account.busy){
       $('accountTestResult').textContent=account.message||'';$('accountTestResult').className='model-result '+(account.ok?'success':'error');
     }
@@ -138,18 +140,20 @@ window.ModelSettings = (() => {
     for(const id of ['apikey','base_url']) $(id).addEventListener('input',()=>{requestId=null;requestSignature=null;clearModels();$('modelToolResult').textContent=''});
     $('model').addEventListener('input',()=>{if(requestKind==='test'){requestId=null;requestSignature=null;$('modelToolResult').textContent=''}$('modelName').textContent=$('model').value||'选择模型';renderModels()});
     for(const id of ['username','password'])$(id).addEventListener('input',()=>{accountRequest=null;accountSignature=null;$('accountTestResult').textContent=''});
-    $('testAccount').onclick=async()=>{
+    const runAccountCheck=async(browserOnly=false)=>{
       try{
         const state=await api.get_state();
         if(state.account_test?.busy){await api.dispatch({action:'stop'});return;}
         const value=accountValue();const initial=JSON.stringify(value);
-        $('accountTestResult').className='model-result';$('accountTestResult').textContent='正在打开测试浏览器并验证登录；如需验证码，请在浏览器中完成…';
-        const result=await api.start_account_test(value);
+        $('accountTestResult').className='model-result';$('accountTestResult').textContent=browserOnly?'正在检查驱动并打开 Edge，无需账号密码…':'正在打开测试浏览器并验证登录；如需验证码，请在浏览器中完成…';
+        const result=browserOnly?await api.start_browser_test():await api.start_account_test(value);
         if(JSON.stringify(accountValue())!==initial)return;
         if(!result.ok){$('accountTestResult').textContent=result.message;$('accountTestResult').classList.add('error');return;}
         accountRequest=result.request_id;accountSignature=initial;update(await api.get_state());
       }catch(_){$('accountTestResult').textContent='登录测试未能启动，请重试。';}
     };
+    $('testAccount').onclick=()=>runAccountCheck(false);
+    $('testBrowser').onclick=()=>runAccountCheck(true);
 
   }
   return {init,update,saveForSettings:()=>ai().apikey?save():Promise.resolve(true)};

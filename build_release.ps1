@@ -12,6 +12,8 @@ New-Item -ItemType Directory -Force $licenses | Out-Null
 python -c "import importlib.metadata as m,pathlib,shutil; root=pathlib.Path('$licenses'); [( (root/d.metadata['Name']/str(f)).parent.mkdir(parents=True,exist_ok=True),shutil.copyfile(d.locate_file(f),root/d.metadata['Name']/str(f))) for d in m.distributions() for f in (d.files or []) if ('license' in str(f).lower() or 'copying' in str(f).lower()) and d.locate_file(f).is_file()]"
 & 'dist/iTEST/iTEST-worker.exe' --self-test
 if ($LASTEXITCODE -ne 0) { throw 'Frozen runtime self-test failed' }
+python verify_frozen_protocol.py
+if ($LASTEXITCODE -ne 0) { throw 'Frozen Unicode protocol test failed' }
 & 'dist/iTEST/iTEST-worker.exe' --browser-test
 if ($LASTEXITCODE -ne 0) { throw 'Frozen Edge browser test failed' }
 & $ISCC installer.iss
