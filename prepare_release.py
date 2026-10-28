@@ -6,7 +6,7 @@ import yaml
 ROOT = Path(__file__).resolve().parent
 DEST = ROOT / 'publish'
 FILES = ['app_paths.py', 'desktop_bridge.py', 'exam_runner.py', 'gui.py', 'gui_worker.py',
-         'model_presets.py', 'test_model_presets.py', 'MODEL_PRESETS.md', 'exam_schema.py', 'test_exam_schema.py', 'task_progress.py', 'itest.py', 'kimi_model.py', 'main.py', 'mp32str.py',
+         'model_connections.py', 'test_model_connections.py', 'model_presets.py', 'test_model_presets.py', 'MODEL_PRESETS.md', 'exam_schema.py', 'test_exam_schema.py', 'task_progress.py', 'itest.py', 'kimi_model.py', 'main.py', 'mp32str.py',
          'test_gui.py', 'test_task_progress.py', 'test_desktop_ui.py', 'test_close_ui.py',
          'requirements.txt', 'requirements-gui.txt', 'requirements-lock.txt',
          'README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'config.example.yml',
@@ -24,13 +24,17 @@ def main():
     config = yaml.safe_load((ROOT/'config.yml').read_text(encoding='utf-8')) or {}
     secrets = [str(config.get(k) or '') for k in ('username', 'password')]
     secrets += [str(config.get('ai', {}).get('apikey') or '')]
+    connections_file=ROOT/'model_connections.yml'
+    if connections_file.exists():
+        connections=yaml.safe_load(connections_file.read_text(encoding='utf-8')) or {}
+        secrets += [str(row.get('ai',{}).get('apikey') or '') for row in connections.get('connections',[])]
     forbidden = ('config.yml', '.env', '.lnk', '.bak', '.log', '.pyc', '.pfx', '.pem')
     count = 0
     candidates = [DEST/name for name in FILES]
     for directory in ('ui', 'assets', '.github'):
         candidates.extend(p for p in (DEST/directory).rglob('*') if p.is_file())
     for path in candidates:
-        if path.name == 'config.yml' or path.suffix in forbidden[1:]:
+        if path.name in ('config.yml','model_connections.yml') or path.suffix in forbidden[1:]:
             raise RuntimeError('Forbidden file in publish directory: '+str(path.relative_to(DEST)))
         data = path.read_bytes()
         if any(secret.encode() in data for secret in secrets if len(secret) >= 4):

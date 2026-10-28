@@ -27,3 +27,6 @@ publish/
 edgedriver.exe
 lib/*.exe
 model/
+
+model_connections.yml
+model_connections.yml.*

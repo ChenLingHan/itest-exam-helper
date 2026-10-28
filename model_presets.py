@@ -11,6 +11,16 @@ PRESETS = [
     {'id': 'gemini', 'label': 'Google Gemini', 'base_url': 'https://generativelanguage.googleapis.com/v1beta/openai', 'model': 'gemini-3.8-flash', 'hint': '使用 Google AI Studio 的 Gemini API Key，需要能访问 Google 服务。'},
 ]
 
+PRESETS += [
+    {'id':'openrouter','label':'OpenRouter','base_url':'https://openrouter.ai/api/v1','model':'','hint':'填写 OpenRouter Key，然后获取模型列表或输入模型 ID。'},
+    {'id':'siliconflow','label':'硅基流动','base_url':'https://api.siliconflow.cn/v1','model':'','hint':'填写硅基流动 Key，然后获取模型列表或输入模型 ID。'},
+]
+for _preset in PRESETS:
+    _preset['category'] = 'aggregator' if _preset['id'] in ('openrouter','siliconflow') else 'official'
+    _preset['aliases'] = {'qwen-cn':'阿里云 百炼 dashscope qwen tongyi','qwen-sg':'阿里云 百炼 新加坡 qwen',
+        'zhipu':'智谱 glm bigmodel zhipu','kimi':'月之暗面 moonshot kimi','siliconflow':'硅基流动 siliconflow'} .get(_preset['id'],_preset['id'])
+    _preset['protocol'] = 'OpenAI Chat Completions'
+
 
 def get_presets():
     return deepcopy(PRESETS)
@@ -27,7 +37,9 @@ def normalize_ai(ai):
         preset = next((p for p in PRESETS if p['id'] == provider), None)
         if preset is None:
             raise ValueError('请选择有效的模型服务商，或选择自定义。')
-        result.update(base_url=preset['base_url'], model=preset['model'])
+        # A preset seeds a connection. User edits are retained when it is saved.
+        result.setdefault('base_url',preset['base_url'])
+        result.setdefault('model',preset['model'])
     result['provider'] = provider
     return result
 

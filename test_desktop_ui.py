@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import tempfile
 import time
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 import webview
 from desktop_bridge import Bridge
 from task_progress import TaskProgress
@@ -42,11 +42,40 @@ def check(window,bridge):
         assert window.evaluate_js("document.querySelector('#page-settings').classList.contains('active')"), '设置页未切换'
         assert window.evaluate_js("document.querySelector('#page-settings .content').scrollHeight>=document.querySelector('#page-settings .content').clientHeight"), '设置页滚动异常'
         assert window.evaluate_js("document.querySelectorAll('input[type=password]').length===2"), '密码与密钥未遮蔽'
-        assert window.evaluate_js("document.querySelector('#provider').options.length===8 && document.querySelector('#provider').value==='custom'"), '预设列表或旧配置识别错误'
-        window.evaluate_js("document.querySelector('#apikey').value='private-test-key';document.querySelector('#provider').value='qwen-cn';document.querySelector('#provider').dispatchEvent(new Event('change'))")
-        assert window.evaluate_js("document.querySelector('#apikey').value==='' && document.querySelector('#base_url').value==='https://dashscope.aliyuncs.com/compatible-mode/v1' && document.querySelector('#model').value==='qwen-plus' && document.querySelector('#model').readOnly"), '切换服务商未正确配置或未清除旧密钥'
-        window.evaluate_js("document.querySelector('#provider').value='custom';document.querySelector('#provider').dispatchEvent(new Event('change'))")
-        assert window.evaluate_js("!document.querySelector('#model').readOnly && document.querySelector('#advanced').open"), '无法使用自定义接口'
+        assert window.evaluate_js("document.querySelectorAll('.provider-card').length===10 && document.querySelector('#provider').value==='custom'"), '预设目录或旧配置识别错误'
+        window.evaluate_js("document.querySelector('#apikey').value='private-test-key'; [...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('通义千问 · 北京')).click()")
+        assert window.evaluate_js("document.querySelector('#apikey').value==='' && document.querySelector('#model').value==='qwen-plus' && !document.querySelector('#model').readOnly"), '新平台携带了旧 Key 或模型被锁死'
+        window.evaluate_js("document.querySelector('#model').value='my-qwen-model';document.querySelector('#apikey').value='qwen-private-test';[...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('自定义')).click()")
+        assert window.evaluate_js("document.querySelector('#apikey').value==='private-test-key' && document.querySelector('#advanced').open"), '旧平台的未保存草稿丢失'
+        window.evaluate_js("[...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('通义千问 · 北京')).click()")
+        assert window.evaluate_js("document.querySelector('#apikey').value==='qwen-private-test' && document.querySelector('#model').value==='my-qwen-model'"), '来回切换未保留独立模型与密钥'
+        window.evaluate_js("document.querySelector('#providerSearch').value='openrouter';document.querySelector('#providerSearch').dispatchEvent(new Event('input'))")
+        assert window.evaluate_js("document.querySelectorAll('.provider-card').length===1 && document.querySelector('.provider-card').textContent.includes('OpenRouter')"), '服务商搜索失败'
+        window.evaluate_js("document.querySelector('#providerSearch').value='';document.querySelector('#providerSearch').dispatchEvent(new Event('input'))")
+        window.evaluate_js("document.querySelector('#saveConnection').click()")
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline and not bridge.get_connections()['connections']: time.sleep(.05)
+        assert len(bridge.get_connections()['connections'])==1, '连接未持久化'
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline:
+            if window.evaluate_js("document.querySelector('#connectionResult').textContent.includes('已保存')"): break
+            time.sleep(.05)
+        assert window.evaluate_js("document.querySelectorAll('.connection-card').length===1"), '已保存连接未显示'
+        window.evaluate_js("document.querySelector('#newConnection').click()")
+        assert window.evaluate_js("document.querySelector('#apikey').value===''")
+        window.evaluate_js("document.querySelector('.connection-card').click()")
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline:
+            if window.evaluate_js("document.querySelector('#apikey').value==='qwen-private-test'"): break
+            time.sleep(.05)
+        assert window.evaluate_js("document.querySelector('#model').value==='my-qwen-model' && document.querySelector('#apikey').value==='qwen-private-test'"), '连接切换未恢复模型与 Key'
+        window.evaluate_js("document.querySelector('#fetchModels').click()")
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline:
+            if window.evaluate_js("document.querySelector('#availableModels').options.length===1"): break
+            time.sleep(.05)
+        assert window.evaluate_js("document.querySelector('#availableModels').options[0].value==='ui-test-model'"), '模型获取结果未显示'
+        assert 'qwen-private-test' not in json.dumps(bridge.get_state()), '状态中泄露 Key'
         assert bridge._pending is None
         bridge._task=TaskProgress({'ksdId':'123','ksName':'离线进度检查'},True)
         bridge._task.consume('共 6 组、25 道题，需处理 33 份有效录音。')
@@ -113,7 +142,8 @@ if __name__=='__main__':
         bridge._session=bridge._config.copy()
         bridge._process=MagicMock()
         bridge._state.update(connected=True,papers=[{'ksdId':'123','ksName':'示例英语听力'}, {'ksdId':'456','ksName':'<img src=x onerror=window.injected=1>'}])
-        html=(ROOT/'ui/index.html').read_text(encoding='utf-8').replace('__ITEST_ICON__','data:image/png;base64,'+base64.b64encode((ROOT/'assets/itest-icon-32.png').read_bytes()).decode())
+        html=(ROOT/'ui/index.html').read_text(encoding='utf-8').replace('__MODEL_SETTINGS_SCRIPT__',(ROOT/'ui/model-settings.js').read_text(encoding='utf-8')).replace('__ITEST_ICON__','data:image/png;base64,'+base64.b64encode((ROOT/'assets/itest-icon-32.png').read_bytes()).decode())
         window=webview.create_window('iTEST offline UI check',html=html,js_api=bridge,width=680,height=480,hidden=True)
-        webview.start(check,(window,bridge),gui='edgechromium',private_mode=True)
+        with patch('desktop_bridge.model_tool',return_value={'ok':True,'models':['ui-test-model'],'message':'离线模型列表'}):
+            webview.start(check,(window,bridge),gui='edgechromium',private_mode=True)
     raise SystemExit(bool(errors))

@@ -4,7 +4,7 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 
 ## 下载安装
 
-在 [Releases](https://github.com/ChenLingHan/iTEST-exam-helper/releases/tag/v1.1.0-beta.2) 下载 `iTEST-Exam-Helper-1.1.0-beta.2-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
+在 [Releases](https://github.com/ChenLingHan/iTEST-exam-helper/releases/tag/v1.1.0-beta.3) 下载 `iTEST-Exam-Helper-1.1.0-beta.3-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
 
 - 支持 Windows 10/11 64 位（x64），无需安装 Python 或手动安装依赖。
 - 内置英语离线语音模型及 FFmpeg。
@@ -14,7 +14,7 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 
 ## 首次使用
 
-1. 打开“设置”，填写自己的 iTEST 账号、密码，选择模型服务商并粘贴对应的 API Key，然后保存。
+1. 打开“设置”，填写自己的 iTEST 账号、密码，搜索并选择服务商，填写 API Key，选择或输入模型 ID，然后保存连接和设置。
 2. 点击获取试卷，在列表中选择目标试卷；需要考试码时填写考试码。
 3. 默认只填写答案，完成后在 Edge 中检查；只有显式选择自动交卷并确认后才会提交。
 
@@ -23,12 +23,15 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 本版通过合成页面及已有听力页面离线验证，尚未验证各类真实试卷的完整流程，不能承诺覆盖所有考试。口语录音、图片/视频题、富文本编辑器以及不认识的控件会停止处理；新页面结构需继续适配。默认不自动交卷。
 模型生成的答案可能有误，应自行复核；使用模型服务可能产生费用。请仅在获得授权的场景使用。
 
-模型服务预设包括 DeepSeek、通义千问（北京/新加坡）、Kimi、智谱 GLM、OpenAI 和 Gemini；地址及模型自动填写。切换服务商会清空 API Key；已有自定义配置保留。其他接口可选择“自定义”。地域、模型权限和网络需与所选平台匹配，详见 [预设依据](MODEL_PRESETS.md)。
+模型设置采用连接管理方式：按官方服务、聚合平台和自定义分类搜索，提供 OpenRouter、硅基流动等聚合平台。同一服务商可保存多个独立命名的连接；每套连接保留自己的密钥、接口和模型。预设只填写起始值，地址和模型均可修改。旧配置自动迁入“原有模型配置”。
+
+点击“获取模型列表”可查询平台的模型 ID，也可手动输入；平台列表不保证每个模型都支持文本对话和 JSON 输出。点击“测试连接”会发送一条简短 JSON 请求，可能消耗少量 Token。保存和切换不会自动调用模型。连接测试只验证当前接口与模型的兼容性，不代表答题准确率。参考来源及协议边界见 [模型连接说明](MODEL_PRESETS.md)。
 
 ## 本地数据与隐私
 
 发布包中的账号、密码和密钥均为空，不包含开发者的配置、录音、试卷、截图或浏览器会话。
 安装版将设置保存在 `%LOCALAPPDATA%\iTEST-Exam-Helper\config.yml`，缓存和日志位于同目录 `.exam_work`。
+独立模型连接保存在同一数据目录的 `model_connections.yml`，保存的连接文件也含明文密钥。
 设置以明文保存在当前 Windows 用户目录中，请勿分享该文件或整个数据目录。
 卸载程序保留设置及缓存；如需清理，可在退出程序后自行删除上述数据目录。
 
@@ -57,7 +60,7 @@ Copy-Item config.example.yml config.yml
 在 Windows x64 上使用 Python 3.13、锁定依赖及 Inno Setup 6.7.3：
 
 ```powershell
-python -m unittest test_gui test_task_progress test_release test_exam_schema test_model_presets
+python -m unittest test_gui test_task_progress test_release test_exam_schema test_model_presets test_model_connections
 New-Item -ItemType Directory -Force .release-tools
 Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile .release-tools/MicrosoftEdgeWebview2Setup.exe
 .\build_release.ps1 -ISCC 'C:\path\to\ISCC.exe'

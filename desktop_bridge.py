@@ -11,6 +11,8 @@ import threading
 import yaml
 from task_progress import TaskProgress
 from model_presets import get_presets, normalize_ai, infer_provider
+from model_connections import Connections, checked_ai, model_tool, tool_error
+import uuid
 from app_paths import DATA_ROOT, RESOURCE_ROOT, worker_command
 
 ROOT = DATA_ROOT
@@ -46,10 +48,11 @@ class Bridge:
         self._notice_id=0
         self._allow_close=False
         self._close_after_stop=False
+        self._connections=None
         self._task=None
         self._config={'username':'','password':'','sleep_time':10,'ai':{'provider':'deepseek','base_url':'https://api.deepseek.com','model':'deepseek-flash','apikey':''}}
         self._state={'version':0,'activity':'idle','busy':False,'stopping':False,'connected':False,'papers':[],
-            'logs':[],'status':'准备就绪','notice':None,'progress':None,'task':None,'page':'papers','completed':False,'blocked_paper_ids':[]}
+            'model_tools':{'busy':False},'logs':[],'status':'准备就绪','notice':None,'progress':None,'task':None,'page':'papers','completed':False,'blocked_paper_ids':[]}
         try:
             file=self._root/'config.yml'
             if file.exists():
@@ -63,6 +66,58 @@ class Bridge:
             self._state['page']='settings'
             self._notice('配置文件未能读取，请检查 config.yml 或重新填写设置。',True)
 
+        try:
+            self._connections=Connections(self._root,self._config['ai'])
+            active=self._connections.data.get('active_id')
+            if active:
+                self._config['ai']=self._connections.get(active)['ai']
+        except Exception:
+            self._state['page']='settings'
+            self._notice('模型连接文件无法读取，原文件已保留，请检查 model_connections.yml。',True)
+
+    def get_connections(self):
+        with self._lock:
+            return self._connections.summary() if self._connections else {'active_id':None,'connections':[]}
+
+    def change_connection(self,action,payload):
+        with self._lock:
+            try:
+                if self._state['busy']: raise ValueError('任务进行中，请结束后再切换模型连接。')
+                if self._connections is None: raise ValueError('请先修复 model_connections.yml，避免覆盖已有连接。')
+                if action=='save':
+                    row=self._connections.save(payload.get('id'),payload.get('name'),payload.get('ai'))
+                elif action=='activate':
+                    row=self._connections.activate(payload.get('id'))
+                else: raise ValueError('不支持的模型连接操作。')
+                self._config['ai']=row['ai']
+                self._touch()
+                return {'ok':True,'selected':row,'catalog':self._connections.summary()}
+            except ValueError as error:
+                return {'ok':False,'message':str(error)}
+            except Exception:
+                return {'ok':False,'message':'连接保存失败，原配置仍保留，请检查本地数据目录。'}
+
+    def start_model_tool(self,kind,value):
+        with self._lock:
+            try:
+                if self._state['busy'] or self._state['model_tools'].get('busy'):
+                    raise ValueError('请等待当前任务结束。')
+                if kind not in ('models','test'): raise ValueError('不支持的模型检查操作。')
+                ai=checked_ai(value,need_model=kind=='test')
+            except ValueError as error:
+                return {'ok':False,'message':str(error)}
+            request_id=uuid.uuid4().hex
+            self._state['model_tools']={'busy':True,'request_id':request_id,'kind':kind}
+            self._touch()
+            def work():
+                try: result=model_tool(ai,kind)
+                except Exception as error: result={'ok':False,'message':tool_error(error)}
+                with self._lock:
+                    self._state['model_tools']={**result,'busy':False,'request_id':request_id,'kind':kind}
+                    self._touch()
+            threading.Thread(target=work,daemon=True).start()
+            return {'ok':True,'request_id':request_id}
+
     def get_state(self):
         with self._lock: return copy.deepcopy(self._state)
 
@@ -75,6 +130,9 @@ class Bridge:
     def _redact(self,text):
         for config in (self._config,self._session or {}):
             for secret in (config.get('password'),config.get('ai',{}).get('apikey')):
+                if secret: text=text.replace(str(secret),'***')
+        if self._connections:
+            for secret in self._connections.secrets():
                 if secret: text=text.replace(str(secret),'***')
         return text
 

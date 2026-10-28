@@ -6,7 +6,7 @@ import sys
 FROZEN = getattr(sys, 'frozen', False)
 RESOURCE_ROOT = Path(__file__).resolve().parent
 DATA_ROOT = (Path(os.environ.get('LOCALAPPDATA', Path.home() / 'AppData' / 'Local')) / 'iTEST-Exam-Helper') if FROZEN else RESOURCE_ROOT
-VERSION = '1.1.0-beta.2'
+VERSION = '1.1.0-beta.3'
 
 
 def worker_command():

@@ -15,7 +15,7 @@ jobs:
           python-version: '3.13'
           architecture: x64
       - run: python -m pip install -r requirements-lock.txt
-      - run: python -m unittest test_gui test_task_progress test_release test_exam_schema test_model_presets
+      - run: python -m unittest test_gui test_task_progress test_release test_exam_schema test_model_presets test_model_connections
       - name: Obtain public runtime resources
         shell: pwsh
         run: |

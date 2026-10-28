@@ -26,9 +26,10 @@ class ModelPresetTests(unittest.TestCase):
             config=bridge._normalize({'ai':ai})
             self.assertEqual(config['ai'],{**ai,'provider':'custom'})
 
-    def test_preset_cannot_redirect_key_via_modified_fields(self):
+    def test_preset_seeds_defaults_and_retains_explicit_user_edits(self):
         ai=normalize_ai({'provider':'deepseek','base_url':'https://example.com','model':'wrong','apikey':'test'})
-        self.assertEqual(ai['base_url'],'https://api.deepseek.com')
+        self.assertEqual(ai['base_url'],'https://example.com')
+        self.assertEqual(ai['model'],'wrong')
         with self.assertRaises(ValueError):
             normalize_ai({'provider':'unknown'})
 

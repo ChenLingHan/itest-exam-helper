@@ -22,6 +22,7 @@ def main():
     smoke='--smoke-test' in sys.argv
     html=(ROOT/'ui'/'index.html').read_text(encoding='utf-8')
     logo=base64.b64encode((ROOT/'assets'/'itest-icon-32.png').read_bytes()).decode()
+    html=html.replace('__MODEL_SETTINGS_SCRIPT__',(ROOT/'ui'/'model-settings.js').read_text(encoding='utf-8'))
     html=html.replace('__ITEST_ICON__','data:image/png;base64,'+logo)
     window=webview.create_window('iTEST',html=html,js_api=api,width=860,height=600,min_size=(680,480),hidden=smoke,
         background_color='#ffffff',text_select=True,confirm_close=False)
