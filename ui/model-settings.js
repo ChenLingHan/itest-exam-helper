@@ -3,7 +3,8 @@ window.ModelSettings = (() => {
   const $ = id => document.getElementById(id);
   let api, presets=[], catalog={connections:[]}, selectedId=null, category='all';
   let requestId=null, requestSignature=null, requestKind=null, locked=false, changing=false;
-  let models=[], appliedRequest=null, accountRequest=null, accountSignature=null;
+  let models=[], appliedRequest=null, accountRequest=null, accountSignature=null, accountKind=null;
+  const checks={browser:{state:'idle',detail:''},account:{state:'idle',detail:''},model:{state:'idle',detail:''}};
   const drafts=new Map();
   const ai=()=>({provider:$('provider').value,base_url:$('base_url').value,model:$('model').value,apikey:$('apikey').value});
   const snapshot=()=>({ai:ai(),name:$('connectionName').value});
@@ -11,16 +12,34 @@ window.ModelSettings = (() => {
   const accountValue=()=>({username:$('username').value,password:$('password').value});
   function showModels(open){$('modelPicker').hidden=!open;$('toggleModels').setAttribute('aria-expanded',String(open));if(open)renderModels()}
   function renderModels(){const query=$('modelSearch').value.trim().toLowerCase();const filtered=models.filter(m=>m.toLowerCase().includes(query));$('modelOptions').replaceChildren();$('modelCount').textContent='共 '+models.length+' 个模型，当前显示 '+filtered.length+' 个';$('noModels').hidden=filtered.length>0;for(const id of filtered){const option=document.createElement('button');option.type='button';option.className='model-option';option.setAttribute('role','option');option.setAttribute('aria-selected',String(id===$('model').value));option.textContent=id;option.disabled=locked;option.onclick=()=>{$('model').value=id;$('model').dispatchEvent(new Event('input'));showModels(false);$('model').focus()};$('modelOptions').append(option)}}
-  function clearModels(){models=[];$('modelSearch').value='';$('modelOptions').replaceChildren();$('toggleModels').disabled=true;$('toggleModels').textContent='选择模型';showModels(false)}
+  function clearModels(){models=[];$('modelSearch').value='';$('modelOptions').replaceChildren();$('toggleModels').disabled=locked||!ai().apikey.trim();$('toggleModels').textContent='获取模型';showModels(false)}
   const draftKey=()=>selectedId?'saved:'+selectedId:'preset:'+$('provider').value;
   const remember=()=>drafts.set(draftKey(),snapshot());
   function message(text,error=false){$('connectionResult').textContent=text;$('connectionResult').style.color=error?'#b42318':'';}
+  function renderChecks(){
+    const config=[['browser','testBrowser','browserTestResult','browserReady','检查浏览器','✓ 浏览器正常','停止检查','重新检查','浏览器'],['account','testAccount','accountTestResult','accountReady','验证登录','✓ 登录已通过','停止验证','重新验证','账号'],['model','testModel','modelToolResult','modelReady','验证模型','✓ 模型可用','验证中…','重新验证','模型']];
+    for(const [key,buttonId,resultId,readyId,idle,passed,running,error,label] of config){
+      const check=checks[key],button=$(buttonId);
+      button.classList.toggle('is-success',check.state==='passed');button.classList.toggle('is-error',check.state==='error');button.classList.toggle('is-running',check.state==='running');
+      button.textContent=check.state==='passed'?passed:check.state==='running'?running:check.state==='error'?error:idle;
+      button.title=check.detail||(key==='model'?'发送少量请求验证模型，可能消耗 Token':'可随时点击重新检查');
+      button.setAttribute('aria-label',label+'：'+(check.state==='passed'?'已通过':check.state==='running'?'正在检查':check.state==='error'?'未通过':'待检查'));
+      if(key!=='model'||check.state!=='idle'){
+        $(resultId).textContent=check.detail;$(resultId).className='check-detail '+(check.state==='passed'?'success':check.state==='error'?'error':'');
+      }
+      const ready=$(readyId);ready.classList.toggle('passed',check.state==='passed');ready.classList.toggle('failed',check.state==='error');
+      ready.textContent=label+(check.state==='passed'?'已通过':check.state==='running'?'检查中':check.state==='error'?'需重试':'待检查');
+    }
+  }
+  function resetModelCheck(){checks.model={state:'idle',detail:''};renderChecks()}
   function fill(value){
+    const previous=JSON.stringify(ai());
     for(const k of ['provider','base_url','model','apikey']) $(k).value=value.ai[k]??(k==='provider'?'custom':'');
     if(!presets.some(p=>p.id===$('provider').value))$('provider').value='custom';
     $('connectionName').value=value.name;
     $('base_url').readOnly=false;$('model').readOnly=false;
     $('advanced').open=$('provider').value==='custom';
+    if(previous!==JSON.stringify(ai()))resetModelCheck();
     const preset=presets.find(p=>p.id===$('provider').value);
     $('providerHint').textContent=(preset?.hint||'使用兼容 OpenAI Chat Completions 的接口。')+' 模型和接口均可修改。';
     $('modelName').textContent=$('model').value||'选择模型';
@@ -34,25 +53,15 @@ window.ModelSettings = (() => {
     const preset=presets.find(p=>p.id===id);
     fill(!fresh&&drafts.has('preset:'+id)?drafts.get('preset:'+id):{
       name:preset.label,ai:{provider:id,base_url:preset.base_url,model:preset.model,apikey:''}});
-    message('新连接；填好后点击“保存并使用此连接”。');
+    message('新配置，填写后保存设置');
   }
   function renderCards(){
-    const query=$('providerSearch').value.trim().toLowerCase();
     $('providerCards').replaceChildren();
-    const matches=presets.filter(p=>(category==='all'||p.category===category)&&[p.label,p.aliases,p.base_url].join(' ').toLowerCase().includes(query));
-    for(const p of matches){
+    for(const p of presets){
       const card=document.createElement('button');card.type='button';card.className='provider-card'+($('provider').value===p.id?' active':'');
-      card.disabled=locked||changing;card.setAttribute('aria-pressed',String($('provider').value===p.id));
-      const title=document.createElement('strong');title.textContent=p.label;
-      const detail=document.createElement('small');detail.textContent=p.id==='custom'?'填写自己的 API 接口':p.protocol;card.append(title,detail);
-      card.onclick=()=>selectPreset(p.id);$('providerCards').append(card);
-    }
-    $('noProviders').hidden=matches.length>0;
-    $('providerCategories').replaceChildren();
-    for(const [id,label] of [['all','全部'],['official','官方服务'],['custom','自定义']]){
-      const button=document.createElement('button');button.type='button';button.className=category===id?'active':'';
-      const count=presets.filter(p=>(id==='all'||p.category===id)&&[p.label,p.aliases,p.base_url].join(' ').toLowerCase().includes(query)).length;
-      button.textContent=label+' '+count;button.onclick=()=>{category=id;renderCards()};$('providerCategories').append(button);
+      card.disabled=locked||changing;card.setAttribute('aria-pressed',String($('provider').value===p.id));card.title=p.hint||'填写自己的模型服务地址';
+      const title=document.createElement('strong');title.textContent=p.id==='custom'?'自定义':p.id==='kimi'?'Kimi':p.id==='zhipu'?'GLM':p.label;
+      card.append(title);card.onclick=()=>selectPreset(p.id);$('providerCards').append(card);
     }
   }
   function renderSaved(){
@@ -69,12 +78,12 @@ window.ModelSettings = (() => {
           if(!result.ok){message(result.message,true);return;}
           catalog=result.catalog;selectedId=row.id;
           fill(drafts.get('saved:'+row.id)||{name:result.selected.name,ai:result.selected.ai});
-          message('已切换连接；重新获取试卷后用于后台任务。');
+          message('已切换，重新获取试卷后生效');
         }catch(_){message('切换失败，请重试。',true)}finally{changing=false;renderSaved();renderCards()}
       };
       $('savedConnections').append(button);
     }
-    if(!catalog.connections.length){const p=document.createElement('p');p.className='provider-hint';p.textContent='尚未保存连接，先从下面选一个服务商。';$('savedConnections').append(p)}
+    if(!catalog.connections.length){const p=document.createElement('p');p.className='provider-hint';p.textContent='选择服务商，填写密钥后保存即可。';$('savedConnections').append(p)}
   }
   async function save(){
     if(locked||changing)return false;changing=true;$('saveConnection').disabled=true;
@@ -83,42 +92,44 @@ window.ModelSettings = (() => {
       if(!result.ok){message(result.message,true);return false;}
       selectedId=result.selected.id;catalog=result.catalog;
       fill({name:result.selected.name,ai:result.selected.ai});remember();
-      message('已保存并使用；重新获取试卷后生效。');return true;
+      message('模型配置已保存');return true;
     }catch(_){message('保存失败，请重试。',true);return false}finally{changing=false;$('saveConnection').disabled=locked;renderSaved();renderCards()}
   }
   async function runTool(kind){
     if(locked)return;
-    const initial=signature(kind);$('modelToolResult').className='model-result full';$('modelToolResult').textContent=kind==='models'?'正在获取模型列表…':'正在检查连接与 JSON 输出…';
+    const initial=signature(kind);if(kind==='test'){checks.model={state:'running',detail:''};renderChecks()}$('modelToolResult').className='check-detail';$('modelToolResult').textContent=kind==='models'?'正在获取模型列表…':'正在检查连接与 JSON 输出…';
     try{
       const result=await api.start_model_tool(kind,ai());
       if(signature(kind)!==initial)return;
-      if(!result.ok){$('modelToolResult').textContent=result.message;$('modelToolResult').classList.add('error');return;}
+      if(!result.ok){if(kind==='test'){checks.model={state:'error',detail:result.message};renderChecks()}else{$('modelToolResult').textContent=result.message;$('modelToolResult').className='check-detail error'}return;}
       requestId=result.request_id;requestSignature=initial;requestKind=kind;
       update(await api.get_state());
-    }catch(_){$('modelToolResult').textContent='请求未完成，请重试。'}
+    }catch(_){if(kind==='test'){checks.model={state:'error',detail:'请求未完成，请重试。'};renderChecks()}else{$('modelToolResult').textContent='请求未完成，请重试。'}}
   }
   function update(state){
     locked=Boolean(state.busy);const tool=state.model_tools||{};
     const account=state.account_test||{};
-    $('fetchModels').textContent=tool.busy&&tool.kind==='models'?'获取中…':'获取模型列表';
-    $('testModel').textContent=tool.busy&&tool.kind==='test'?'检查中…':'测试连接';
+    $('fetchModels').textContent=tool.busy&&tool.kind==='models'?'获取中…':'刷新';
     $('testBrowser').disabled=locked&&!(account.busy&&account.browser_only);
-    $('testBrowser').textContent=account.busy&&account.browser_only?'停止浏览器检查':'检查浏览器';
     $('testAccount').disabled=locked&&(!account.busy||account.browser_only);
-    $('testAccount').textContent=account.busy&&!account.browser_only?'停止登录测试':'测试 iTEST 登录';
-    if(account.request_id===accountRequest&&accountSignature===JSON.stringify(accountValue())&&!account.busy){
-      $('accountTestResult').textContent=account.message||'';$('accountTestResult').className='model-result '+(account.ok?'success':'error');
+    if(account.busy){const key=account.browser_only?'browser':'account';checks[key].state='running'}
+    if(account.request_id===accountRequest&&(accountKind==='browser'||accountSignature===JSON.stringify(accountValue()))&&!account.busy){
+      checks[accountKind]={state:account.ok?'passed':'error',detail:account.message||''};
+      if(accountKind==='account'&&account.ok)checks.browser={state:'passed',detail:'已在本次登录验证中成功启动浏览器'};
+      accountRequest=null;
     }
-    $('toggleModels').disabled=locked||models.length===0;
+    renderChecks();
+    $('toggleModels').disabled=locked||Boolean(tool.busy)||!ai().apikey.trim();
     for(const id of ['newConnection','saveConnection','connectionName','fetchModels','testModel']) $(id).disabled=locked||(changing&&id!=='connectionName')||(Boolean(tool.busy)&&['fetchModels','testModel'].includes(id));
     if(tool.request_id===requestId&&requestSignature===signature()&&!tool.busy&&tool.request_id!==appliedRequest){
       appliedRequest=tool.request_id;
       $('modelToolResult').textContent=tool.message||'';
-      $('modelToolResult').className='model-result full '+(tool.ok?'success':'error');
+      $('modelToolResult').className='check-detail '+(tool.ok?'success':'error');
+      if(tool.kind==='test'){checks.model={state:tool.ok?'passed':'error',detail:tool.message||''};renderChecks()}
       if(Array.isArray(tool.models)){
         models=[...tool.models];$('modelSearch').value='';
-        $('toggleModels').textContent='选择模型（'+models.length+'）';
-        $('toggleModels').disabled=locked||models.length===0;showModels(models.length>0);
+        $('toggleModels').textContent='选择模型';
+        $('toggleModels').disabled=locked||Boolean(tool.busy)||!ai().apikey.trim();showModels(models.length>0);
       }
     }
     renderSaved();renderCards();
@@ -131,26 +142,25 @@ window.ModelSettings = (() => {
     const row=catalog.connections.find(c=>c.id===selectedId);
     const provider=value.ai?.provider||(presets.find(p=>p.base_url.replace(/\/$/,'')===(value.ai?.base_url||'').replace(/\/$/,'')&&p.model===value.ai?.model)?.id||'custom');
     fill({name:row?.name||presets.find(p=>p.id===provider)?.label||'我的连接',ai:{...value.ai,provider}});
-    $('providerSearch').oninput=renderCards;
     $('newConnection').onclick=()=>selectPreset($('provider').value,true);$('saveConnection').onclick=save;
     $('fetchModels').onclick=()=>runTool('models');$('testModel').onclick=()=>runTool('test');
-    $('toggleModels').onclick=()=>showModels($('modelPicker').hidden);
+    $('toggleModels').onclick=()=>models.length?showModels($('modelPicker').hidden):runTool('models');
     $('modelSearch').oninput=renderModels;
     $('modelPicker').addEventListener('keydown',event=>{if(event.key==='Escape'){showModels(false);$('toggleModels').focus()}});
-    for(const id of ['apikey','base_url']) $(id).addEventListener('input',()=>{requestId=null;requestSignature=null;clearModels();$('modelToolResult').textContent=''});
-    $('model').addEventListener('input',()=>{if(requestKind==='test'){requestId=null;requestSignature=null;$('modelToolResult').textContent=''}$('modelName').textContent=$('model').value||'选择模型';renderModels()});
-    for(const id of ['username','password'])$(id).addEventListener('input',()=>{accountRequest=null;accountSignature=null;$('accountTestResult').textContent=''});
+    for(const id of ['apikey','base_url']) $(id).addEventListener('input',()=>{requestId=null;requestSignature=null;clearModels();$('toggleModels').disabled=locked||!ai().apikey.trim();$('modelToolResult').textContent='';resetModelCheck()});
+    $('model').addEventListener('input',()=>{if(requestKind==='test'){requestId=null;requestSignature=null;$('modelToolResult').textContent=''}$('modelName').textContent=$('model').value||'选择模型';resetModelCheck();renderModels()});
+    for(const id of ['username','password'])$(id).addEventListener('input',()=>{if(accountKind==='account'){accountRequest=null;accountSignature=null}checks.account={state:'idle',detail:''};renderChecks()});
     const runAccountCheck=async(browserOnly=false)=>{
       try{
         const state=await api.get_state();
         if(state.account_test?.busy){await api.dispatch({action:'stop'});return;}
         const value=accountValue();const initial=JSON.stringify(value);
-        $('accountTestResult').className='model-result';$('accountTestResult').textContent=browserOnly?'正在检查驱动并打开 Edge，无需账号密码…':'正在打开测试浏览器并验证登录；如需验证码，请在浏览器中完成…';
+        const key=browserOnly?'browser':'account';checks[key]={state:'running',detail:browserOnly?'正在准备驱动并打开 Edge…':'正在验证登录，如出现验证码，请在浏览器中完成。'};renderChecks();
         const result=browserOnly?await api.start_browser_test():await api.start_account_test(value);
         if(JSON.stringify(accountValue())!==initial)return;
-        if(!result.ok){$('accountTestResult').textContent=result.message;$('accountTestResult').classList.add('error');return;}
-        accountRequest=result.request_id;accountSignature=initial;update(await api.get_state());
-      }catch(_){$('accountTestResult').textContent='登录测试未能启动，请重试。';}
+        if(!result.ok){checks[key]={state:'error',detail:result.message};renderChecks();return;}
+        accountRequest=result.request_id;accountSignature=initial;accountKind=key;update(await api.get_state());
+      }catch(_){checks[browserOnly?'browser':'account']={state:'error',detail:'检查未能启动，请重试。'};renderChecks()}
     };
     $('testAccount').onclick=()=>runAccountCheck(false);
     $('testBrowser').onclick=()=>runAccountCheck(true);

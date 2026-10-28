@@ -3,6 +3,7 @@ import base64
 import os
 import sys
 import json
+import time
 from pathlib import Path
 from desktop_bridge import Bridge, validate_config
 from app_paths import RESOURCE_ROOT
@@ -35,16 +36,18 @@ def screen_work_area():
 
 def main():
     import webview
+    smoke='--smoke-test' in sys.argv
     if os.name=='nt':
         import ctypes
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('iTEST.ListeningAssistant')
         ctypes.windll.kernel32.CreateMutexW.restype=ctypes.c_void_p
-        mutex=ctypes.windll.kernel32.CreateMutexW(None,False,'Local\\iTEST.ModernDesktop')
+        mutex_name='Local\\iTEST.ModernDesktop.Smoke' if smoke else 'Local\\iTEST.ModernDesktop'
+        mutex=ctypes.windll.kernel32.CreateMutexW(None,False,mutex_name)
         if ctypes.windll.kernel32.GetLastError()==183: return
     api=Bridge()
-    smoke='--smoke-test' in sys.argv
     html=(ROOT/'ui'/'index.html').read_text(encoding='utf-8')
     logo=base64.b64encode((ROOT/'assets'/'itest-icon-32.png').read_bytes()).decode()
+    html=html.replace('__APP_STYLES__',(ROOT/'ui/app.css').read_text(encoding='utf-8'))
     html=html.replace('__MODEL_SETTINGS_SCRIPT__',(ROOT/'ui'/'model-settings.js').read_text(encoding='utf-8'))
     html=html.replace('__ITEST_ICON__','data:image/png;base64,'+logo)
     width,height,minimum=initial_window_size(*screen_work_area())
@@ -58,6 +61,12 @@ def main():
             if not window.events.loaded.wait(30): raise RuntimeError('WebView2 load timeout')
             if not window.evaluate_js("document.getElementById('username')!==null && document.getElementById('run')!==null"):
                 raise RuntimeError('UI controls missing')
+            deadline=time.monotonic()+10
+            while time.monotonic()<deadline:
+                if window.evaluate_js("document.querySelectorAll('.provider-card').length===5 && document.getElementById('statusText').textContent!=='正在连接本地服务…' && getComputedStyle(document.getElementById('browserSection')).backgroundColor==='rgb(255, 255, 255)'"):
+                    break
+                time.sleep(.1)
+            else: raise RuntimeError('New settings layout did not finish loading')
             api._send({'action':'close'})
             process=api._process
             if process and process.wait(timeout=20)!=0: raise RuntimeError('Worker failed')
