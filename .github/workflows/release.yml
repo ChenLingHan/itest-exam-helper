@@ -15,7 +15,7 @@ jobs:
           python-version: '3.13'
           architecture: x64
       - run: python -m pip install -r requirements-lock.txt
-      - run: python -m unittest test_gui test_task_progress test_release
+      - run: python -m unittest test_gui test_task_progress test_release test_exam_schema
       - name: Obtain public runtime resources
         shell: pwsh
         run: |
@@ -38,4 +38,4 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create ${{ github.ref_name }} release/* --title 'iTEST Exam Helper ${{ github.ref_name }}' --notes-file RELEASE_NOTES.md
+        run: gh release create ${{ github.ref_name }} release/* --title 'iTEST Exam Helper ${{ github.ref_name }}' --notes-file RELEASE_NOTES.md --prerelease

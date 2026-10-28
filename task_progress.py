@@ -43,7 +43,7 @@ class TaskProgress:
             groups,questions,audio=map(int,match.groups())
             for key,total in (('download',audio),('transcribe',audio),('generate',groups),('fill',questions)):
                 self._get(key)['total']=total
-            self._stage('download'); self.value['detail']='开始下载对应听力录音'
+            self._stage('download' if audio else 'generate'); self.value['detail']='开始下载对应听力录音' if audio else '纯文字试卷，无需录音，正在准备答案'
         elif '题目页面已就绪' in message:
             stage=self._get('enter'); stage.update(done=1,state='complete')
             self.value['detail']='试卷已就绪，正在读取题目'
@@ -61,14 +61,14 @@ class TaskProgress:
             self._get('transcribe')['active']=None
             self.value['detail']=f'已转写 {done}/{total} 份录音'
         elif '正在生成答案' in message:
-            self._stage('generate'); self.value['detail']='听力转写完成，正在等待模型返回答案'
+            self._stage('generate'); self.value['detail']='题目材料已就绪，正在等待模型返回答案'
         elif (match:=re.search(r'答案生成\s*(\d+)/(\d+)',message)):
             done,total=map(int,match.groups()); self._count('generate',done,total,True)
             self.value['detail']=f'已生成并校验 {done}/{total} 组答案'
         elif (match:=re.search(r'答案已填入\s*(\d+)/(\d+)',message)):
             done,total=map(int,match.groups()); self._count('fill',done,total)
             self.value['detail']=f'已填写 {done}/{total} 题'+('，正在核对选项' if done==total else '')
-        elif (match:=re.search(r'已核对\s*(\d+)\s*道题全部选中',message)):
+        elif (match:=re.search(r'已核对\s*(\d+)\s*道题全部(?:选中|填写)',message)):
             total=int(match[1]); self._count('fill',total,total,True)
             self.value['detail']=f'{total} 道题已全部填写并通过核对'
         elif (match:=re.search(r'答案核对完成，\s*([\d.]+)\s*秒后交卷',message)):

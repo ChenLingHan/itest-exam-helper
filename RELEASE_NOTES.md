@@ -1,17 +1,9 @@
-# iTEST Exam Helper v1.0.0
+# v1.1.0-beta.1
 
-- Windows 10/11 x64 installer, including Python, desktop dependencies, FFmpeg and the English speech model.
-- Single-window desktop interface with settings, paper selection, progress and logs.
-- Listening multiple-choice workflow; review answers in Edge before optional submission.
-- Per-user settings and cache under `%LOCALAPPDATA%\iTEST-Exam-Helper`.
-- No developer account, password, API key, recordings, exam pages or cache included.
+- 从仅听力引擎扩展为通用英语试卷引擎，读取分组上下文和阅读材料。
+- 支持标准单选、多选、下拉选择、文本填空及多行写作控件。
+- 按题型校验模型输出；全卷完整性检查通过后才开始填写，交卷前再次读取控件核对。
+- 无录音试卷跳过语音处理，界面名称和进度适配综合试卷。
+- 图片、视频、富文本、口语等未适配控件停止处理。
 
-Download `iTEST-Exam-Helper-1.0.0-windows-x64-setup.exe`, install, then launch iTEST.
-Microsoft Edge and WebView2 are required. The installer checks WebView2 and offers
-to download its Microsoft bootstrapper when missing. First login requires internet
-access to obtain the Edge driver. Enter your own iTEST credentials and API key in Settings.
-The API provider may charge for usage. Current support is limited to listening
-multiple-choice papers; generated answers require review.
-
-The installer is not code-signed. SHA256SUMS.txt provides the installer checksum.
-Uninstall removes program files and retains your local settings and cache.
+这是测试版：已做合成页面和本地听力页面离线验证，尚未在真实综合试卷中完成端到端验证，不承诺全部题型兼容。默认仅填写供复核。安装包不含开发者配置和考试数据。

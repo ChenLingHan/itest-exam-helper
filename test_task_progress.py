@@ -9,6 +9,16 @@ class ProgressTests(unittest.TestCase):
         task.consume('共 6 组、25 道题，需处理 33 份有效录音。')
         return task
 
+    def test_text_only_skips_audio_stages(self):
+        task=TaskProgress({'ksdId':'1'},False)
+        task.consume('共 3 组、12 道题，需处理 0 份有效录音。')
+        state=task.snapshot()
+        self.assertEqual(state['stage'],'generate')
+        self.assertEqual(state['stages'][1]['total'],0)
+        self.assertEqual(state['stages'][2]['state'],'complete')
+        task.consume('已核对 12 道题全部填写并通过校验。')
+        self.assertEqual(task.snapshot()['stages'][4]['state'],'complete')
+
     def test_transcription_start_is_not_completion(self):
         task=self.task()
         task.consume('录音下载 33/33')

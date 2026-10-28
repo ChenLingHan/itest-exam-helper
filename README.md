@@ -1,10 +1,10 @@
 # iTEST Exam Helper
 
-Windows 桌面版 iTEST 英语听力辅助工具，基于 [YDHusky/itest](https://github.com/YDHusky/itest) 改进，采用 AGPL-3.0 许可证。非 iTEST 官方产品。
+Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https://github.com/YDHusky/itest) 改进，采用 AGPL-3.0 许可证。非 iTEST 官方产品。
 
 ## 下载安装
 
-在 [Releases](https://github.com/ChenLingHan/iTEST-exam-helper/releases/latest) 下载 `iTEST-Exam-Helper-1.0.0-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
+在 [Releases](https://github.com/ChenLingHan/iTEST-exam-helper/releases/tag/v1.1.0-beta.1) 下载 `iTEST-Exam-Helper-1.1.0-beta.1-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
 
 - 支持 Windows 10/11 64 位（x64），无需安装 Python 或手动安装依赖。
 - 内置英语离线语音模型及 FFmpeg。
@@ -18,7 +18,9 @@ Windows 桌面版 iTEST 英语听力辅助工具，基于 [YDHusky/itest](https:
 2. 点击获取试卷，在列表中选择目标试卷；需要考试码时填写考试码。
 3. 默认只填写答案，完成后在 Edge 中检查；只有显式选择自动交卷并确认后才会提交。
 
-当前桌面引擎仅支持“我的考试”中的听力单选题。出现其他题型时会停止处理。
+项目目标是覆盖 iTEST 各类英语考试。当前测试版支持标准单选、多选、下拉选择、文本填空及多行写作控件，可读取阅读材料与听力转写，并在生成后逐题填写和核对。纯文字试卷无需语音转写。
+
+本版通过合成页面及已有听力页面离线验证，尚未验证各类真实试卷的完整流程，不能承诺覆盖所有考试。口语录音、图片/视频题、富文本编辑器以及不认识的控件会停止处理；新页面结构需继续适配。默认不自动交卷。
 模型生成的答案可能有误，应自行复核；使用模型服务可能产生费用。请仅在获得授权的场景使用。
 
 ## 本地数据与隐私
@@ -53,7 +55,7 @@ Copy-Item config.example.yml config.yml
 在 Windows x64 上使用 Python 3.13、锁定依赖及 Inno Setup 6.7.3：
 
 ```powershell
-python -m unittest test_gui test_task_progress test_release
+python -m unittest test_gui test_task_progress test_release test_exam_schema
 New-Item -ItemType Directory -Force .release-tools
 Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile .release-tools/MicrosoftEdgeWebview2Setup.exe
 .\build_release.ps1 -ISCC 'C:\path\to\ISCC.exe'
