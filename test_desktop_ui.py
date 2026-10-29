@@ -54,23 +54,20 @@ def check(window,bridge):
         assert window.evaluate_js("document.querySelector('#apikey').value==='private-test-key' && document.querySelector('#advanced').open"), '旧平台的未保存草稿丢失'
         window.evaluate_js("[...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('DeepSeek')).click()")
         assert window.evaluate_js("document.querySelector('#apikey').value==='deepseek-private-test' && document.querySelector('#model').value==='my-deepseek-model'"), '来回切换未保留独立模型与密钥'
-        window.evaluate_js("document.querySelector('#saveConnection').click()")
+        assert window.evaluate_js("document.querySelector('#savedConnections')===null && document.querySelector('#newConnection')===null && document.querySelector('#connectionName')===null"), '配置管理入口仍在界面中'
+        assert window.evaluate_js("getComputedStyle(document.querySelector('.provider-card.active'),'::after').content==='none' && !document.querySelector('#advanced').open && document.querySelector('#model').closest('#advanced')!==null"), '服务商仍有对勾或高级模型字段没有折叠'
+        window.evaluate_js("document.querySelector('#save').click()")
         deadline=time.monotonic()+5
-        while time.monotonic()<deadline and not bridge.get_connections()['connections']: time.sleep(.05)
-        assert len(bridge.get_connections()['connections'])==1, '连接未持久化'
+        while time.monotonic()<deadline and not window.evaluate_js("document.querySelector('#save').classList.contains('is-saved')"): time.sleep(.05)
+        assert len(bridge.get_connections()['connections'])==3, '保存服务商时丢失旧配置或产生重复项'
+        assert window.evaluate_js("document.querySelector('#save').classList.contains('is-saved')"), '简单流程保存失败'
+        window.evaluate_js("[...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('Kimi')).click()")
         deadline=time.monotonic()+5
-        while time.monotonic()<deadline:
-            if window.evaluate_js("document.querySelector('#connectionResult').textContent.includes('已保存')"): break
-            time.sleep(.05)
-        assert window.evaluate_js("document.querySelectorAll('.connection-card').length===1"), '已保存连接未显示'
-        window.evaluate_js("document.querySelector('#newConnection').click()")
-        assert window.evaluate_js("document.querySelector('#apikey').value===''")
-        window.evaluate_js("document.querySelector('.connection-card').click()")
-        deadline=time.monotonic()+5
-        while time.monotonic()<deadline:
-            if window.evaluate_js("document.querySelector('#apikey').value==='deepseek-private-test'"): break
-            time.sleep(.05)
-        assert window.evaluate_js("document.querySelector('#model').value==='my-deepseek-model' && document.querySelector('#apikey').value==='deepseek-private-test'"), '连接切换未恢复模型与 Key'
+        while time.monotonic()<deadline and window.evaluate_js("document.querySelector('#provider').value!=='kimi'"):time.sleep(.03)
+        assert window.evaluate_js("document.querySelector('#apikey').value==='kimi-private-test' && !document.querySelector('#advanced').open"), '未恢复另一服务商已保存的密钥'
+        assert bridge.get_config()['ai']['provider']=='deepseek', '仅选择服务商就改写了已保存的设置'
+        window.evaluate_js("[...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('DeepSeek')).click()")
+        assert window.evaluate_js("document.querySelector('#model').value==='my-deepseek-model' && document.querySelector('#apikey').value==='deepseek-private-test'"), '切回服务商后密钥或模型丢失'
         window.evaluate_js("document.querySelector('#model').value='deepseek-flash';document.querySelector('#model').dispatchEvent(new Event('input'));document.querySelector('#toggleModels').click()")
         deadline=time.monotonic()+5
         while time.monotonic()<deadline:
@@ -119,13 +116,10 @@ def check(window,bridge):
             if window.evaluate_js("document.querySelector('#testModel').classList.contains('is-success')"): break
             time.sleep(.05)
         assert window.evaluate_js("document.querySelector('#testModel').classList.contains('is-success')"), '模型验证成功后没有绿色反馈'
-        window.evaluate_js("document.querySelector('#saveConnection').click()")
+        window.evaluate_js("document.querySelector('#save').click()")
         deadline=time.monotonic()+5
-        while time.monotonic()<deadline:
-            if window.evaluate_js("document.querySelector('#connectionResult').textContent.includes('已保存')"): break
-            time.sleep(.05)
-        assert window.evaluate_js("document.querySelector('#testModel').classList.contains('is-success')"), '保存相同配置后丢失成功状态'
-        assert window.evaluate_js("document.querySelector('#savedConnections').hidden && !document.querySelector('#connectionName').value.includes('原有模型配置')"), '单套配置仍显示多余名称'
+        while time.monotonic()<deadline and not window.evaluate_js("document.querySelector('#save').classList.contains('is-saved')"): time.sleep(.05)
+        assert window.evaluate_js("document.querySelector('#testModel').classList.contains('is-success')"), '保存相同模型后丢失验证状态'
         notice_id=bridge._notice_id
         assert window.evaluate_js("document.querySelector('#save').click();document.querySelector('#save').click();document.querySelector('#save').getAttribute('aria-busy')==='true'"), '保存时没有忙碌反馈'
         deadline=time.monotonic()+5
@@ -140,10 +134,7 @@ def check(window,bridge):
         assert window.evaluate_js("![...document.querySelectorAll('.toast-text')].some(el=>el.textContent.includes('全部设置已保存')) && document.querySelector('#save').classList.contains('is-saved')"), '消息没有自动消失或保存按钮随提示重置'
         window.evaluate_js("navigate('logs')");time.sleep(.45);window.evaluate_js("navigate('settings')");time.sleep(.45)
         assert window.evaluate_js("document.querySelector('#save').classList.contains('is-saved') && document.querySelector('#testModel').classList.contains('is-success')"), '切换页面重置了成功状态'
-        original_name=window.evaluate_js("document.querySelector('#connectionName').value")
-        window.evaluate_js("document.querySelector('#connectionName').value+='-edit';document.querySelector('#connectionName').dispatchEvent(new Event('input',{bubbles:true}))")
-        assert window.evaluate_js("!document.querySelector('#save').classList.contains('is-saved') && document.querySelector('#save').textContent==='保存更改' && document.querySelector('#testModel').classList.contains('is-success')"), '更改配置名称错误影响验证状态'
-        window.evaluate_js("document.querySelector('#connectionName').value="+json.dumps(original_name)+";document.querySelector('#connectionName').dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#username').value='';document.querySelector('#username').dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#save').click()")
+        window.evaluate_js("document.querySelector('#username').value='';document.querySelector('#username').dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#save').click()")
         deadline=time.monotonic()+5
         while time.monotonic()<deadline and not bridge.get_state().get('notice',{}).get('error'):time.sleep(.05)
         time.sleep(.3)
@@ -214,6 +205,8 @@ if __name__=='__main__':
     with tempfile.TemporaryDirectory() as folder:
         bridge=Bridge(folder)
         bridge._config={'username':'offline-test','password':'test-password','sleep_time':1,'ai':{'model':'test-model','apikey':'test-key','base_url':'https://example.com/v1'}}
+        bridge._connections.save(None,'Kimi',{'provider':'kimi','base_url':'https://api.moonshot.cn/v1','model':'kimi-k2.6','apikey':'kimi-private-test'})
+        bridge._connections.save(None,'Custom',bridge._config['ai'])
         bridge._session=bridge._config.copy()
         bridge._process=MagicMock()
         bridge._state.update(page='papers',connected=True,papers=[{'ksdId':'123','ksName':'示例英语听力'}, {'ksdId':'456','ksName':'<img src=x onerror=window.injected=1>'}])

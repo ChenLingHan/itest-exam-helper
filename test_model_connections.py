@@ -15,6 +15,20 @@ def ai(key='key-one',model='my-model'):
 
 
 class ConnectionTests(unittest.TestCase):
+    def test_reading_provider_does_not_activate_or_rewrite_settings(self):
+        with tempfile.TemporaryDirectory() as folder:
+            bridge=Bridge(folder)
+            one=bridge.change_connection('save',{'id':None,'name':'A','ai':ai('private-one')})
+            two=bridge.change_connection('save',{'id':None,'name':'B','ai':ai('private-two')})
+            path=Path(folder,'model_connections.yml');before=path.read_bytes()
+            result=bridge.get_connection(one['selected']['id'])
+            self.assertTrue(result['ok'])
+            self.assertEqual(result['selected']['ai']['apikey'],'private-one')
+            self.assertEqual(bridge.get_connections()['active_id'],two['selected']['id'])
+            self.assertEqual(bridge.get_config()['ai']['apikey'],'private-two')
+            self.assertEqual(before,path.read_bytes())
+            self.assertFalse(bridge.get_connection('missing')['ok'])
+
     def test_independent_keys_same_provider_survive_restart_and_edit(self):
         with tempfile.TemporaryDirectory() as folder:
             store=Connections(folder,{})

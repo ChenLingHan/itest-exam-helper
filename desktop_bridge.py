@@ -82,6 +82,15 @@ class Bridge:
         with self._lock:
             return self._connections.summary() if self._connections else {'active_id':None,'connections':[]}
 
+    def get_connection(self,key):
+        """Read a saved provider without activating it or writing settings."""
+        with self._lock:
+            try:
+                if self._connections is None: raise ValueError('模型设置无法读取，请先检查本地配置文件。')
+                return {'ok':True,'selected':self._connections.get(key)}
+            except ValueError as error:
+                return {'ok':False,'message':str(error)}
+
     def change_connection(self,action,payload):
         with self._lock:
             try:

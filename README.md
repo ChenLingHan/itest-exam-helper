@@ -4,7 +4,7 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 
 ## 下载安装
 
-在 [Releases](https://github.com/ChenLingHan/iTEST-exam-helper/releases/tag/v1.1.0-beta.7) 下载 `iTEST-Exam-Helper-1.1.0-beta.7-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
+在 [Releases](https://github.com/ChenLingHan/iTEST-exam-helper/releases/tag/v1.1.0-beta.8) 下载 `iTEST-Exam-Helper-1.1.0-beta.8-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
 
 - 支持 Windows 10/11 64 位（x64），无需安装 Python 或手动安装依赖。
 - 内置英语离线语音模型及 FFmpeg。
@@ -21,7 +21,7 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 
 默认仅填写供复核；开启“自动交卷”前请确认试卷。模型可能答错，调用模型服务可能产生费用。支持的题型、数据处理方式及构建信息见下文；仅在获得授权的场景使用。
 
-配置名称、接口地址、交卷等待和单独保存模型配置均收在“高级设置”中。正常使用不需要展开；旧配置保持可用。模型接口依据与历史调整见 [模型连接说明](MODEL_PRESETS.md)。
+模型设置只需选择服务商、填写 API Key，再点击顶部“保存全部设置”。模型名称和接口地址已预填，获取模型列表、修改接口及交卷等待收在“高级设置”中；验证模型为可选操作。切换服务商会保留各平台的密钥，旧配置保持可用。模型接口依据与历史调整见 [模型连接说明](MODEL_PRESETS.md)。
 
 当前引擎支持标准单选、多选、下拉选择、文本填空与多行写作控件，可读取阅读材料及听力转写。口语、图片/视频、富文本和未识别控件会停止处理；综合真实试卷尚未全面验证，不能承诺覆盖全部考试。
 

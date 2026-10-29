@@ -1,23 +1,21 @@
 /* Connection manager: local drafts never cross provider boundaries. */
 window.ModelSettings = (() => {
   const $ = id => document.getElementById(id);
-  let api, presets=[], catalog={connections:[]}, selectedId=null, category='all';
+  let api, presets=[], catalog={connections:[]}, selectedId=null;
   let requestId=null, requestSignature=null, requestKind=null, locked=false, changing=false;
   let models=[], appliedRequest=null, accountRequest=null, accountSignature=null, accountKind=null;
   const checks={browser:{state:'idle',detail:''},account:{state:'idle',detail:''},model:{state:'idle',detail:''}};
   const drafts=new Map();
   let lastModelInput=null,lastAccountInput=null;
   const ai=()=>({provider:$('provider').value,base_url:$('base_url').value,model:$('model').value,apikey:$('apikey').value});
-  const snapshot=()=>({ai:ai(),name:$('connectionName').value});
+  const snapshot=()=>({id:selectedId,ai:ai()});
   const signature=(kind=requestKind)=>JSON.stringify(kind==='models'?{provider:ai().provider,base_url:ai().base_url,apikey:ai().apikey}:ai());
   const accountValue=()=>({username:$('username').value,password:$('password').value});
   function showModels(open){$('modelPicker').hidden=!open;$('toggleModels').setAttribute('aria-expanded',String(open));if(open)renderModels()}
   function renderModels(){const query=$('modelSearch').value.trim().toLowerCase();const filtered=models.filter(m=>m.toLowerCase().includes(query));$('modelOptions').replaceChildren();$('modelCount').textContent='共 '+models.length+' 个模型，当前显示 '+filtered.length+' 个';$('noModels').hidden=filtered.length>0;for(const id of filtered){const option=document.createElement('button');option.type='button';option.className='model-option';option.setAttribute('role','option');option.setAttribute('aria-selected',String(id===$('model').value));option.textContent=id;option.disabled=locked;option.onclick=()=>{$('model').value=id;$('model').dispatchEvent(new Event('input'));showModels(false);$('model').focus()};$('modelOptions').append(option)}}
   function clearModels(){models=[];$('modelSearch').value='';$('modelOptions').replaceChildren();$('toggleModels').disabled=locked||!ai().apikey.trim();$('toggleModels').textContent='获取模型';showModels(false)}
-  const draftKey=()=>selectedId?'saved:'+selectedId:'preset:'+$('provider').value;
-  const remember=()=>drafts.set(draftKey(),snapshot());
-  function message(text,error=false){$('connectionResult').textContent=text;Notifications.show(text,{error});}
-  const displayName=(name,provider)=>name==='原有模型配置'?(presets.find(p=>p.id===provider)?.label||'我的模型'):name;
+  const remember=()=>drafts.set($('provider').value,snapshot());
+  function message(text,error=false){Notifications.show(text,{error});}
   function renderChecks(){
     const config=[['browser','testBrowser','browserTestResult','browserReady','检查浏览器','✓ 浏览器正常','停止检查','重新检查','浏览器'],['account','testAccount','accountTestResult','accountReady','验证登录','✓ 登录已通过','停止验证','重新验证','账号'],['model','testModel','modelToolResult','modelReady','验证模型','✓ 模型可用','验证中…','重新验证','模型']];
     for(const [key,buttonId,resultId,readyId,idle,passed,running,error,label] of config){
@@ -40,7 +38,7 @@ window.ModelSettings = (() => {
     const previous=JSON.stringify(ai());
     for(const k of ['provider','base_url','model','apikey']) $(k).value=value.ai[k]??(k==='provider'?'custom':'');
     if(!presets.some(p=>p.id===$('provider').value))$('provider').value='custom';
-    $('connectionName').value=displayName(value.name,$('provider').value);
+    selectedId=value.id??null;
     $('base_url').readOnly=false;$('model').readOnly=false;
     $('advanced').open=$('provider').value==='custom';
     if(previous!==JSON.stringify(ai()))resetModelCheck();
@@ -50,17 +48,27 @@ window.ModelSettings = (() => {
     $('modelName').textContent=$('model').value||'选择模型';
     clearModels();
     $('modelToolResult').textContent='';requestId=null;requestSignature=null;
-    renderCards();renderSaved();
+    renderCards();
     $('page-settings').dispatchEvent(new Event('change'));
   }
-  function selectPreset(id,fresh=false){
-    if(locked||changing)return;
-    if(!fresh&&id===$('provider').value)return;
-    remember();selectedId=null;
-    const preset=presets.find(p=>p.id===id);
-    fill(!fresh&&drafts.has('preset:'+id)?drafts.get('preset:'+id):{
-      name:preset.label,ai:{provider:id,base_url:preset.base_url,model:preset.model,apikey:''}});
-    $('connectionResult').textContent='';
+  async function selectPreset(id){
+    if(locked||changing||id===$('provider').value)return;
+    remember();changing=true;renderCards();$('page-settings').dispatchEvent(new Event('change'));
+    try{
+      const preset=presets.find(p=>p.id===id);
+      let value=drafts.get(id);
+      if(!value){
+        const saved=catalog.connections.filter(row=>(presets.some(p=>p.id===row.provider)?row.provider:'custom')===id);
+        const row=saved.find(row=>row.id===catalog.active_id)||saved.at(-1);
+        if(row){
+          const result=await api.get_connection(row.id);
+          if(!result.ok){message(result.message,true);return;}
+          value={id:row.id,ai:{...result.selected.ai,provider:id}};
+        }else value={id:null,ai:{provider:id,base_url:preset.base_url,model:preset.model,apikey:''}};
+      }
+      fill(value);
+    }catch(_){message('读取服务商设置失败，请重试。',true)}
+    finally{changing=false;renderCards();$('page-settings').dispatchEvent(new Event('change'))}
   }
   function renderCards(){
     $('providerCards').replaceChildren();
@@ -73,37 +81,16 @@ window.ModelSettings = (() => {
       card.append(logo,title);card.onclick=()=>selectPreset(p.id);$('providerCards').append(card);
     }
   }
-  function renderSaved(){
-    $('savedConnections').replaceChildren();
-    $('savedConnections').hidden=!catalog.connections.length||(catalog.connections.length===1&&selectedId!==null);
-    for(const row of catalog.connections){
-      const button=document.createElement('button');button.type='button';button.className='connection-card'+(selectedId===row.id?' active':'');
-      button.disabled=locked||changing;button.setAttribute('aria-pressed',String(selectedId===row.id));
-      const name=document.createElement('strong');name.textContent=displayName(row.name,row.provider);
-      const detail=document.createElement('small');detail.textContent=row.model+(catalog.active_id===row.id?' · 当前使用':'');button.append(name,detail);
-      button.onclick=async()=>{
-        if(changing||locked)return;remember();changing=true;
-        try{
-          const result=await api.change_connection('activate',{id:row.id});
-          if(!result.ok){message(result.message,true);return;}
-          catalog=result.catalog;selectedId=row.id;
-          fill(drafts.get('saved:'+row.id)||{name:result.selected.name,ai:result.selected.ai});
-          message('已切换，重新获取试卷后生效');
-        }catch(_){message('切换失败，请重试。',true)}finally{changing=false;renderSaved();renderCards()}
-      };
-      $('savedConnections').append(button);
-    }
-    if(!catalog.connections.length){const p=document.createElement('p');p.className='provider-hint';p.textContent='选择服务商，填写密钥后保存即可。';$('savedConnections').append(p)}
-  }
-  async function save({silent=false}={}){
-    if(locked||changing)return false;changing=true;$('saveConnection').disabled=true;
+  async function save(){
+    if(locked||changing)return false;changing=true;$('page-settings').dispatchEvent(new Event('change'));
     try{
-      const result=await api.change_connection('save',{id:selectedId,name:$('connectionName').value,ai:ai()});
+      const existing=catalog.connections.find(row=>row.id===selectedId);
+      const name=existing?.name||presets.find(p=>p.id===ai().provider)?.label||'我的模型';
+      const result=await api.change_connection('save',{id:selectedId,name,ai:ai()});
       if(!result.ok){message(result.message,true);return false;}
-      selectedId=result.selected.id;catalog=result.catalog;
-      fill({name:result.selected.name,ai:result.selected.ai});remember();
-      if(!silent)message('模型配置已保存');return true;
-    }catch(_){message('保存失败，请重试。',true);return false}finally{changing=false;$('saveConnection').disabled=locked;renderSaved();renderCards()}
+      catalog=result.catalog;fill({id:result.selected.id,ai:result.selected.ai});remember();return true;
+    }catch(_){message('保存失败，请重试。',true);return false}
+    finally{changing=false;renderCards();$('page-settings').dispatchEvent(new Event('change'))}
   }
   async function runTool(kind){
     if(locked)return;
@@ -131,7 +118,7 @@ window.ModelSettings = (() => {
     }
     renderChecks();
     $('toggleModels').disabled=locked||Boolean(tool.busy)||!ai().apikey.trim();
-    for(const id of ['newConnection','saveConnection','connectionName','fetchModels','testModel']) $(id).disabled=locked||(changing&&id!=='connectionName')||(Boolean(tool.busy)&&['fetchModels','testModel'].includes(id));
+    for(const id of ['fetchModels','testModel']) $(id).disabled=locked||changing||(Boolean(tool.busy)&&['fetchModels','testModel'].includes(id));
     if(tool.request_id===requestId&&requestSignature===signature()&&!tool.busy&&tool.request_id!==appliedRequest){
       appliedRequest=tool.request_id;
       Notifications.show(tool.message||'请求已完成',{error:!tool.ok,key:'model:'+tool.request_id});
@@ -144,7 +131,7 @@ window.ModelSettings = (() => {
         $('toggleModels').disabled=locked||Boolean(tool.busy)||!ai().apikey.trim();showModels(models.length>0);
       }
     }
-    renderSaved();renderCards();
+    renderCards();
   }
   async function init(value,bridge){
     api=bridge;
@@ -154,8 +141,7 @@ window.ModelSettings = (() => {
     catalog=await api.get_connections();selectedId=catalog.active_id;
     const row=catalog.connections.find(c=>c.id===selectedId);
     const provider=value.ai?.provider||(presets.find(p=>p.base_url.replace(/\/$/,'')===(value.ai?.base_url||'').replace(/\/$/,'')&&p.model===value.ai?.model)?.id||'custom');
-    fill({name:row?.name||presets.find(p=>p.id===provider)?.label||'我的连接',ai:{...value.ai,provider}});
-    $('newConnection').onclick=()=>selectPreset($('provider').value,true);$('saveConnection').onclick=()=>save();
+    fill({id:row?.id??null,ai:{...value.ai,provider}});
     $('fetchModels').onclick=()=>runTool('models');$('testModel').onclick=()=>runTool('test');
     $('toggleModels').onclick=()=>models.length?showModels($('modelPicker').hidden):runTool('models');
     $('modelSearch').oninput=renderModels;
@@ -179,5 +165,5 @@ window.ModelSettings = (() => {
     $('testBrowser').onclick=()=>runAccountCheck(true);
 
   }
-  return {init,update,saveForSettings:()=>ai().apikey?save({silent:true}):Promise.resolve(true)};
+  return {init,update,isChanging:()=>changing,saveForSettings:()=>{if(ai().apikey.trim())return save();if(catalog.active_id){message('请填写所选服务商的 API Key 后再保存。',true);return Promise.resolve(false)}return Promise.resolve(true)}};
 })();
