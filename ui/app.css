@@ -28,8 +28,8 @@ input:focus{border-color:#8794a7}
 .field input{font-size:13px}
 .label-note{font-size:10px;color:#9aa3af;margin-left:3px}
 .check-button{min-width:132px;transition:background .15s,border-color .15s,color .15s}
-button.check-button.is-success{color:#fff;border-color:#15803d;background:#15803d;font-weight:600}
-button.check-button.is-success:hover:not(:disabled){background:#166534;border-color:#166534}
+button.check-button.is-success{color:#166534;border-color:#69b885;background:#edf9f0;font-weight:600}
+button.check-button.is-success:hover:not(:disabled){background:#dff2e5;border-color:#36985b}
 button.check-button.is-error{color:var(--error);border-color:#f2c3bf;background:#fff4f2}
 button.check-button.is-running{background:#f3f4f6;color:#5b6675;border-color:#d9dfe6}
 .check-detail{font-size:12px;line-height:1.65;color:#6b7685;margin-top:9px;overflow-wrap:anywhere}
@@ -91,8 +91,9 @@ button.check-button.is-running{background:#f3f4f6;color:#5b6675;border-color:#d9
 .toast-text{flex:1;min-width:0;padding-top:2px;font-size:13px;white-space:pre-line;overflow-wrap:anywhere;max-height:40vh;overflow:auto}
 .toast-close{border:0;background:transparent;color:inherit;opacity:.6;font-size:20px;line-height:23px;padding:0 3px;border-radius:4px}
 .toast-close:hover{opacity:1;background:#00000008}
-.notice{position:fixed;z-index:1001;top:20px;right:24px;width:min(420px,calc(100vw - 182px));margin:0;padding:16px;box-shadow:0 8px 30px #17263d24;background:#fff;border:1px solid #d9e1ec;max-height:70vh;overflow:auto}
-.notice:before{content:'请确认';display:block;font-size:13px;font-weight:650;color:#334155;margin-bottom:7px}
+.notice{position:fixed;inset:0;width:min(440px,calc(100vw - 40px));height:fit-content;margin:auto;padding:22px;box-shadow:0 16px 60px #17263d30;background:#fff;border:1px solid #d9e1ec;border-radius:14px;max-height:calc(100vh - 40px);overflow:auto;animation:dialog-appear .16s ease}
+.notice::backdrop{background:#17263d40}
+.notice h2{font-size:16px;font-weight:650;color:#263141;margin:0 0 10px}
 .notice-message{font-size:13px;line-height:1.7}
 .notice-actions{margin-top:14px}.notice-actions button{font-size:12px;padding:7px 13px}
 .check-progress{height:3px;margin-top:10px;border-radius:9px;overflow:hidden;background:#e6edf6}
@@ -101,8 +102,9 @@ button.check-button.is-running{background:#f3f4f6;color:#5b6675;border-color:#d9
 button.check-button.is-running:disabled{opacity:1}
 .provider-logo{width:21px;height:21px;stroke:none;fill:currentColor;overflow:visible}
 .provider-card:has(use[href='#i-settings']) .provider-logo{stroke:currentColor;fill:none;width:18px;height:18px}
-button.primary.is-saved{background:#15803d;border-color:#15803d;box-shadow:none}
-button.primary.is-saved:hover:not(:disabled){background:#166534;border-color:#166534}
+button.primary.is-saved{color:#166534;background:#edf9f0;border-color:#69b885;box-shadow:none}
+button.primary.is-saved:hover:not(:disabled){background:#dff2e5;border-color:#36985b}
+@keyframes dialog-appear{from{opacity:0}to{opacity:1}}
 @keyframes checking{from{transform:translateX(-100%)}to{transform:translateX(385%)}}
 @media(prefers-reduced-motion:reduce){.check-progress>span{animation:none;width:100%;opacity:.6}.toast{animation:none}}
 @media(max-width:740px){.toast-region{width:min(320px,calc(100vw - 170px))}}

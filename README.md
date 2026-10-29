@@ -4,7 +4,7 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 
 ## 下载安装
 
-在 [Releases](https://github.com/ChenLingHan/iTEST-exam-helper/releases/tag/v1.1.0-beta.8) 下载 `iTEST-Exam-Helper-1.1.0-beta.8-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
+在 [Releases](https://github.com/ChenLingHan/iTEST-exam-helper/releases/tag/v1.1.0) 下载 `iTEST-Exam-Helper-1.1.0-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
 
 - 支持 Windows 10/11 64 位（x64），无需安装 Python 或手动安装依赖。
 - 内置英语离线语音模型及 FFmpeg。
@@ -16,7 +16,7 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 
 1. 在“设置”的“运行环境”中检查 Edge，成功后按钮会显示绿色“浏览器正常”。
 2. 在独立的“iTEST 账号”区域填写账号和密码，点击“验证登录”；通过后按钮变绿。
-3. 在“答题模型”中选择 DeepSeek、OpenAI、GLM 或 Kimi，填写平台密钥，选择模型并验证。更换密码、密钥或模型后，对应成功状态会清除。
+3. 在“答题模型”中选择 DeepSeek、OpenAI、GLM 或 Kimi，填写 API Key；需要时点击“验证模型”。更换密码、密钥或模型后，对应成功状态会清除。
 4. 点击顶部“保存全部设置”，再前往“我的试卷”获取列表、选择试卷并开始填写。
 
 默认仅填写供复核；开启“自动交卷”前请确认试卷。模型可能答错，调用模型服务可能产生费用。支持的题型、数据处理方式及构建信息见下文；仅在获得授权的场景使用。

@@ -3,6 +3,12 @@ window.Notifications = (() => {
   const root = document.getElementById('toastRegion');
   const active = new Map();
   const seen = new Set();
+  const panel = document.getElementById('notice');
+  let modalId=null;
+  panel.addEventListener('cancel',event=>{
+    event.preventDefault();
+    document.getElementById('dismiss').click();
+  });
   function show(text, {error=false, key=null, duration=error?8000:4200}={}) {
     if (!text || (key && seen.has(key))) return;
     if (key) { seen.add(key); if(seen.size>200) seen.delete(seen.values().next().value); }
@@ -22,15 +28,21 @@ window.Notifications = (() => {
   }
   function clear(){for(const item of active.values())item.close()}
   function backend(notice){
-    const panel=document.getElementById('notice');panel.hidden=!notice?.confirm;
-    if(!notice)return;
+    if(!notice?.confirm){
+      if(panel.open)panel.close();panel.hidden=true;modalId=null;
+      if(notice)show(notice.text,{error:notice.error,key:'notice:'+notice.id});
+      return;
+    }
     if(notice.confirm){
       clear();panel.classList.toggle('error',notice.error);
       document.getElementById('noticeMessage').textContent=notice.text;
       document.getElementById('confirm').hidden=false;
       document.getElementById('confirm').textContent=notice.label;
       document.getElementById('dismiss').textContent='取消';
-    } else show(notice.text,{error:notice.error,key:'notice:'+notice.id});
+      panel.hidden=false;
+      if(!panel.open)panel.showModal();
+      if(modalId!==notice.id){modalId=notice.id;document.getElementById('dismiss').focus()}
+    }
   }
   return {show,backend,clear};
 })();

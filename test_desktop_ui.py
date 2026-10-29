@@ -37,7 +37,27 @@ def check(window,bridge):
         notice=bridge.get_state()['notice']
         assert notice and notice['confirm'], '开始操作缺少窗口内确认'
         assert bridge._pending is not None
-        bridge.dispatch({'action':'dismiss'})
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline and not window.evaluate_js("document.querySelector('#notice').open"):time.sleep(.05)
+        assert window.evaluate_js("(()=>{const d=document.querySelector('#notice'),r=d.getBoundingClientRect();return d.matches(':modal')&&Math.abs(r.x+r.width/2-innerWidth/2)<2&&Math.abs(r.y+r.height/2-innerHeight/2)<2&&r.top>=15&&r.bottom<=innerHeight-15})()"), '确认弹窗未在窗口中央或超出窗口'
+        assert window.evaluate_js("document.activeElement.id==='dismiss'"), '确认弹窗没有默认聚焦取消'
+        window.evaluate_js("document.querySelector('#refresh').focus()")
+        assert window.evaluate_js("document.querySelector('#notice').contains(document.activeElement)"), '确认时焦点泄漏到底层页面'
+        time.sleep(4.6)
+        assert window.evaluate_js("document.querySelector('#notice').open"), '需要确认的弹窗提前自动消失'
+        window.evaluate_js("document.querySelector('#dismiss').click()")
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline and (bridge._pending is not None or window.evaluate_js("document.querySelector('#notice').open")):time.sleep(.05)
+        for trigger,label in [('refresh','重新获取'),('stop','停止任务')]:
+            window.evaluate_js(f"document.querySelector('#{trigger}').click()")
+            deadline=time.monotonic()+5
+            while time.monotonic()<deadline and not window.evaluate_js("document.querySelector('#notice').open && document.querySelector('#confirm').textContent==="+json.dumps(label)):time.sleep(.05)
+            assert window.evaluate_js("document.querySelector('#notice').matches(':modal')"), trigger+' 没有使用居中确认弹窗'
+            window.evaluate_js("document.querySelector('#notice').dispatchEvent(new Event('cancel',{cancelable:true}))")
+            deadline=time.monotonic()+5
+            while time.monotonic()<deadline and (bridge._pending is not None or window.evaluate_js("document.querySelector('#notice').open")):time.sleep(.05)
+            assert bridge._pending is None and not window.evaluate_js("document.querySelector('#notice').open"), 'Esc 取消没有关闭确认且清除待执行操作'
+        assert window.evaluate_js("document.querySelector('.empty-icon use').getAttribute('href')==='#i-file'"), '试卷空白页仍使用听力图标'
         bridge._state['page']='settings'; bridge._touch()
         deadline=time.monotonic()+5
         while time.monotonic()<deadline:

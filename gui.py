@@ -64,14 +64,17 @@ def main():
                 raise RuntimeError('UI controls missing')
             deadline=time.monotonic()+10
             while time.monotonic()<deadline:
-                if window.evaluate_js("document.querySelectorAll('.provider-card').length===5 && document.getElementById('statusText').textContent!=='正在连接本地服务…' && getComputedStyle(document.getElementById('browserSection')).backgroundColor==='rgb(255, 255, 255)'"):
+                if window.evaluate_js("document.querySelectorAll('.provider-card').length===5 && document.getElementById('statusText').textContent==='准备就绪' && typeof Notifications==='object' && getComputedStyle(document.getElementById('browserSection')).backgroundColor==='rgb(255, 255, 255)'"):
                     break
                 time.sleep(.1)
             else: raise RuntimeError('New settings layout did not finish loading')
+            if not window.evaluate_js("Notifications.backend({id:-1,text:'界面自检',confirm:true,label:'继续',error:false});(()=>{const d=document.getElementById('notice'),r=d.getBoundingClientRect();return d.matches(':modal')&&Math.abs(r.x+r.width/2-innerWidth/2)<2&&Math.abs(r.y+r.height/2-innerHeight/2)<2})()"):
+                raise RuntimeError('Centered confirmation dialog failed')
+            window.evaluate_js('Notifications.backend(null)')
             api._send({'action':'close'})
             process=api._process
             if process and process.wait(timeout=20)!=0: raise RuntimeError('Worker failed')
-            report={'ok':True,'webview2':True,'worker_pipe':True,'blank_config':not api._config['username']}
+            report={'ok':True,'webview2':True,'worker_pipe':True,'centered_modal':True,'blank_config':not api._config['username']}
         except Exception as error:
             report={'ok':False,'error':str(error)}
         finally:
