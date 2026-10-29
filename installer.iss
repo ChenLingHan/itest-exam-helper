@@ -1,10 +1,10 @@
-#define AppVersion "1.1.0"
+#define AppVersion "1.2.0"
 [Setup]
 AppId={{961BA730-F384-44E9-A737-EB1606BC8A87}
 AppName=iTEST Exam Helper
 AppVersion={#AppVersion}
 AppPublisher=ChenLingHan
-AppPublisherURL=https://github.com/ChenLingHan/iTEST-exam-helper
+AppPublisherURL=https://github.com/ChenLingHan/itest-exam-helper
 DefaultDirName={localappdata}\Programs\iTEST-Exam-Helper
 DefaultGroupName=iTEST Exam Helper
 PrivilegesRequired=lowest
@@ -30,8 +30,8 @@ Source: "dist\iTEST\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs cr
 Source: ".release-tools\MicrosoftEdgeWebview2Setup.exe"; Flags: dontcopy
 
 [Icons]
-Name: "{group}\iTEST"; Filename: "{app}\iTEST.exe"; WorkingDir: "{app}\_internal"
-Name: "{autodesktop}\iTEST"; Filename: "{app}\iTEST.exe"; WorkingDir: "{app}\_internal"; Tasks: desktopicon
+Name: "{group}\iTEST"; Filename: "{app}\iTEST.exe"; WorkingDir: "{app}\_internal"; AppUserModelID: "ChenLingHan.iTESTExamHelper"
+Name: "{autodesktop}\iTEST"; Filename: "{app}\iTEST.exe"; WorkingDir: "{app}\_internal"; Tasks: desktopicon; AppUserModelID: "ChenLingHan.iTESTExamHelper"
 Name: "{group}\Uninstall iTEST"; Filename: "{uninstallexe}"
 
 [Run]

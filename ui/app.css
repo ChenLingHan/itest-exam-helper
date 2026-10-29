@@ -114,3 +114,10 @@ button.primary.is-saved:hover:not(:disabled){background:#dff2e5;border-color:#36
 
 .model-form-row{grid-template-columns:minmax(0,1fr) auto}
 .model-form-row>.check-button{grid-column:auto;margin-top:25px}
+.version-badge{font-size:10px;font-weight:500;color:#778398;background:#f3f5f8;border-radius:5px;padding:2px 6px}
+.update-row{display:flex;align-items:center;justify-content:space-between;gap:12px}.update-row>p{font-size:12px;color:#647184;overflow-wrap:anywhere}
+.update-buttons{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}.update-buttons button{font-size:11px}
+.update-preference{display:flex;align-items:center;gap:7px;font-size:11px;color:#556277;margin-top:12px;flex-wrap:wrap}.update-preference input{width:14px;height:14px;accent-color:#3155e7;margin:0}.update-preference span{font-size:10px;color:#97a1ae}
+.update-progress{height:4px;background:#e8edf5;border-radius:6px;overflow:hidden;margin-top:11px}.update-progress>span{display:block;height:100%;background:#3155e7;transition:width .2s}
+.update-caption{font-size:10px;color:#8793a3;margin-top:5px}.update-caption:empty{display:none}#updateNotesText{white-space:pre-wrap;font:11px/1.7 inherit;overflow-wrap:anywhere;margin:10px 0 0;color:#687588;max-height:200px;overflow:auto}
+@media(max-width:740px){.update-row{align-items:flex-start;flex-direction:column}.update-buttons{justify-content:flex-start}}

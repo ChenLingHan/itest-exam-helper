@@ -154,6 +154,21 @@ def check(window,bridge):
         assert window.evaluate_js("![...document.querySelectorAll('.toast-text')].some(el=>el.textContent.includes('全部设置已保存')) && document.querySelector('#save').classList.contains('is-saved')"), '消息没有自动消失或保存按钮随提示重置'
         window.evaluate_js("navigate('logs')");time.sleep(.45);window.evaluate_js("navigate('settings')");time.sleep(.45)
         assert window.evaluate_js("document.querySelector('#save').classList.contains('is-saved') && document.querySelector('#testModel').classList.contains('is-success')"), '切换页面重置了成功状态'
+        window.evaluate_js("document.querySelector('#automaticUpdates').click()")
+        deadline=time.monotonic()+3
+        while time.monotonic()<deadline and bridge.get_state()['updates']['automatic']:time.sleep(.03)
+        assert not bridge._updater.snapshot()['automatic'], '更新偏好未保存'
+        updates=bridge._updater.snapshot()
+        bridge._update_event({**updates,'status':'downloading','latest':'99.0.0','received':1048576,'size':2097152,'progress':50,'message':'正在下载更新…'})
+        deadline=time.monotonic()+3
+        while time.monotonic()<deadline and window.evaluate_js("document.querySelector('#updateProgress').hidden"):time.sleep(.05)
+        assert window.evaluate_js("!document.querySelector('#updateProgress').hidden && document.querySelector('#updateProgress').getAttribute('aria-valuenow')==='50' && !document.querySelector('#cancelUpdate').hidden"), '更新下载进度不可见'
+        bridge._update_event({**updates,'status':'ready','latest':'99.0.0','progress':100,'message':'更新已通过校验','notes':'Example notes'})
+        deadline=time.monotonic()+3
+        while time.monotonic()<deadline and window.evaluate_js("document.querySelector('#installUpdate').hidden"):time.sleep(.05)
+        assert window.evaluate_js("!document.querySelector('#installUpdate').hidden && !document.querySelector('#updateNotes').hidden && document.querySelector('#updateProgress').hidden"), '更新完成后不能查看说明和安装入口'
+        assert window.evaluate_js("document.querySelector('#save').classList.contains('is-saved')"), '更新状态错误地重置设置保存状态'
+        bridge._update_event(updates)
         window.evaluate_js("document.querySelector('#username').value='';document.querySelector('#username').dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#save').click()")
         deadline=time.monotonic()+5
         while time.monotonic()<deadline and not bridge.get_state().get('notice',{}).get('error'):time.sleep(.05)
@@ -230,7 +245,7 @@ if __name__=='__main__':
         bridge._session=bridge._config.copy()
         bridge._process=MagicMock()
         bridge._state.update(page='papers',connected=True,papers=[{'ksdId':'123','ksName':'示例英语听力'}, {'ksdId':'456','ksName':'<img src=x onerror=window.injected=1>'}])
-        html=(ROOT/'ui/index.html').read_text(encoding='utf-8').replace('__APP_STYLES__',(ROOT/'ui/app.css').read_text(encoding='utf-8')).replace('__NOTIFICATIONS_SCRIPT__',(ROOT/'ui/notifications.js').read_text(encoding='utf-8')).replace('__MODEL_SETTINGS_SCRIPT__',(ROOT/'ui/model-settings.js').read_text(encoding='utf-8')).replace('__ITEST_ICON__','data:image/png;base64,'+base64.b64encode((ROOT/'assets/itest-icon-32.png').read_bytes()).decode())
+        html=(ROOT/'ui/index.html').read_text(encoding='utf-8').replace('__APP_STYLES__',(ROOT/'ui/app.css').read_text(encoding='utf-8')).replace('__NOTIFICATIONS_SCRIPT__',(ROOT/'ui/notifications.js').read_text(encoding='utf-8')).replace('__UPDATES_SCRIPT__',(ROOT/'ui/updates.js').read_text(encoding='utf-8')).replace('__MODEL_SETTINGS_SCRIPT__',(ROOT/'ui/model-settings.js').read_text(encoding='utf-8')).replace('__ITEST_ICON__','data:image/png;base64,'+base64.b64encode((ROOT/'assets/itest-icon-32.png').read_bytes()).decode())
         test_width,test_height=map(int,os.environ.get('ITEST_UI_TEST_SIZE','680x480').split('x'))
         window=webview.create_window('iTEST offline UI check',html=html,js_api=bridge,width=test_width,height=test_height,hidden=True)
         def fake_model(value,kind):

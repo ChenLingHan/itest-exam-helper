@@ -30,3 +30,6 @@ model/
 
 model_connections.yml
 model_connections.yml.*
+.updates/
+update_settings.json
+update_settings.json.*

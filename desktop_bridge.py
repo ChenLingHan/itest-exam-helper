@@ -14,6 +14,7 @@ from model_presets import get_presets, normalize_ai, infer_provider
 from model_connections import Connections, checked_ai, model_tool, tool_error
 import uuid
 from app_paths import DATA_ROOT, RESOURCE_ROOT, worker_command
+from app_updates import UpdateManager, WEBSITE_URL, start_installer_after_exit
 
 ROOT = DATA_ROOT
 
@@ -77,6 +78,69 @@ class Bridge:
 
         if not self._config.get('username') or not self._config.get('password'):
             self._state['page']='settings'
+        self._updater=UpdateManager(self._root,self._update_event)
+        self._state['updates']=self._updater.snapshot()
+
+    def _update_event(self,value):
+        with self._lock:
+            self._state['updates']=value
+            self._touch()
+
+    def start_update_monitor(self):
+        self._updater.start_monitor()
+
+    def shutdown_updates(self):
+        self._updater.close()
+
+    def check_updates(self):
+        return {'ok':self._updater.check()}
+
+    def download_update(self):
+        return {'ok':self._updater.download()}
+
+    def cancel_update(self):
+        self._updater.cancel_download()
+        return {'ok':True}
+
+    def set_update_automatic(self,enabled):
+        try:
+            self._updater.set_automatic(enabled is True)
+            return {'ok':True}
+        except OSError:
+            return {'ok':False,'message':'更新偏好未能保存，请重试。'}
+
+    def open_website(self):
+        import webbrowser
+        webbrowser.open(WEBSITE_URL)
+        return {'ok':True}
+
+    def install_update(self):
+        with self._lock:
+            if self._updater.snapshot()['status']!='ready':
+                self._notice('请先完成更新下载和校验。',True)
+                return {'ok':False}
+            if self._state['busy'] or self._state['model_tools'].get('busy') or self._process:
+                self._notice('请先结束当前任务并关闭本次浏览器，再安装更新。',True)
+                return {'ok':False}
+            self._notice('即将打开新版安装程序并退出当前窗口。账号、密钥和设置会保留。',action=self._launch_update,label='安装并退出')
+            return {'ok':True}
+
+    def _launch_update(self):
+        if not self._updater.begin_install():return
+        self._state.update(busy=True,activity='updating',status='正在准备安装更新…')
+        self._touch()
+        def launch():
+            try:
+                path,digest=self._updater.installation()
+                start_installer_after_exit(path,digest)
+                self.shutdown_updates()
+                self._destroy_window()
+            except Exception:
+                with self._lock:
+                    self._state.update(busy=False,activity='idle')
+                    self._touch()
+                self._updater.invalidate_download()
+        threading.Thread(target=launch,daemon=True).start()
 
     def get_connections(self):
         with self._lock:

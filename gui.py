@@ -6,7 +6,7 @@ import json
 import time
 from pathlib import Path
 from desktop_bridge import Bridge, validate_config
-from app_paths import RESOURCE_ROOT
+from app_paths import RESOURCE_ROOT, VERSION
 
 ROOT=RESOURCE_ROOT
 
@@ -39,7 +39,7 @@ def main():
     smoke='--smoke-test' in sys.argv
     if os.name=='nt':
         import ctypes
-        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('iTEST.ListeningAssistant')
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('ChenLingHan.iTESTExamHelper')
         ctypes.windll.kernel32.CreateMutexW.restype=ctypes.c_void_p
         mutex_name='Local\\iTEST.ModernDesktop.Smoke' if smoke else 'Local\\iTEST.ModernDesktop'
         mutex=ctypes.windll.kernel32.CreateMutexW(None,False,mutex_name)
@@ -50,6 +50,7 @@ def main():
     html=html.replace('__APP_STYLES__',(ROOT/'ui/app.css').read_text(encoding='utf-8'))
     html=html.replace('__NOTIFICATIONS_SCRIPT__',(ROOT/'ui/notifications.js').read_text(encoding='utf-8'))
     html=html.replace('__MODEL_SETTINGS_SCRIPT__',(ROOT/'ui'/'model-settings.js').read_text(encoding='utf-8'))
+    html=html.replace('__UPDATES_SCRIPT__',(ROOT/'ui'/'updates.js').read_text(encoding='utf-8'))
     html=html.replace('__ITEST_ICON__','data:image/png;base64,'+logo)
     width,height,minimum=initial_window_size(*screen_work_area())
     window=webview.create_window('iTEST',html=html,js_api=api,width=width,height=height,min_size=minimum,hidden=smoke,
@@ -68,6 +69,8 @@ def main():
                     break
                 time.sleep(.1)
             else: raise RuntimeError('New settings layout did not finish loading')
+            if not window.evaluate_js("typeof AppUpdates==='object' && document.getElementById('appVersion').textContent==="+json.dumps('v'+VERSION)+" && document.querySelector('.brand img').naturalWidth===64"):
+                raise RuntimeError('Update controls or high-DPI app icon missing')
             if not window.evaluate_js("Notifications.backend({id:-1,text:'界面自检',confirm:true,label:'继续',error:false});(()=>{const d=document.getElementById('notice'),r=d.getBoundingClientRect();return d.matches(':modal')&&Math.abs(r.x+r.width/2-innerWidth/2)<2&&Math.abs(r.y+r.height/2-innerHeight/2)<2})()"):
                 raise RuntimeError('Centered confirmation dialog failed')
             window.evaluate_js('Notifications.backend(null)')
@@ -81,7 +84,10 @@ def main():
             Path(sys.argv[sys.argv.index('--smoke-test')+1]).write_text(json.dumps(report),encoding='utf-8')
             api._allow_close=True
             window.destroy()
-    webview.start(check if smoke else None,gui='edgechromium',private_mode=True,icon=str(ROOT/'assets'/'itest.ico'))
+    try:
+        webview.start(check if smoke else api.start_update_monitor,gui='edgechromium',private_mode=True,icon=str(ROOT/'assets'/'itest.ico'))
+    finally:
+        api.shutdown_updates()
 
 
 if __name__=='__main__':

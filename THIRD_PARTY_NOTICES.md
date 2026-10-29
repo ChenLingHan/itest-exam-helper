@@ -2,7 +2,8 @@
 
 This application is derived from https://github.com/YDHusky/itest and is
 distributed under the GNU AGPL v3; see LICENSE. This is an independent project.
-The iTEST name and logo belong to their respective owners; see assets/README.md.
+The application icon is original to this project; see assets/README.md.
+The iTEST name and third-party marks belong to their respective owners.
 
 The Windows distribution includes Python (PSF License), pywebview (BSD),
 pythonnet (MIT), Selenium (Apache-2.0), OpenAI Python SDK (Apache-2.0),

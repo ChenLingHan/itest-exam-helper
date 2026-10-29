@@ -2,9 +2,11 @@
 
 Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https://github.com/YDHusky/itest) 改进，采用 AGPL-3.0 许可证。非 iTEST 官方产品。
 
+官网：**https://chenlinghan.github.io/itest-exam-helper/**
+
 ## 下载安装
 
-在 [Releases](https://github.com/ChenLingHan/iTEST-exam-helper/releases/tag/v1.1.0) 下载 `iTEST-Exam-Helper-1.1.0-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
+在 [Releases](https://github.com/ChenLingHan/itest-exam-helper/releases/tag/v1.2.0) 下载 `iTEST-Exam-Helper-1.2.0-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
 
 - 支持 Windows 10/11 64 位（x64），无需安装 Python 或手动安装依赖。
 - 内置英语离线语音模型及 FFmpeg。
@@ -35,6 +37,18 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 设置以明文保存在当前 Windows 用户目录中，请勿分享该文件或整个数据目录。
 卸载程序保留设置及缓存；如需清理，可在退出程序后自行删除上述数据目录。
 
+## 原创图标与自动更新
+
+v1.2.0 使用本项目原创“试卷与辅助星光”图标，替换原先的官方图标；安装程序、任务栏与官网使用同一图形。
+
+程序启动后自动检查正式版本，常规自动检查间隔为 24 小时；已有待安装缓存时会重新确认版本。有新版时后台下载并校验 SHA-256。安装需要你确认，运行任务或浏览器尚未关闭时会阻止安装；确认后等待旧进程退出，再次校验文件并打开安装程序，原有配置保留。在“设置 → 应用与更新”可手动检查、取消下载或关闭自动检查与下载。
+
+更新只访问本项目 GitHub 正式发布信息及附件，不发送 iTEST 账号、密码或 API Key。下载通过校验后才能打开安装程序；安装前再次校验文件，拒绝测试版、外部来源和不完整文件。
+
+v1.1.0 及更早版本没有内置更新功能，需要先手动安装本次新版。更新偏好位于用户数据目录的 `update_settings.json`，安装包缓存位于 `.updates/`。
+
+官网源码在 `website/`，通过 `.github/workflows/pages.yml` 发布到 GitHub Pages；页面不包含账号或密钥输入表单。
+
 语音转写在本地完成；生成答案时会将题目、选项和转写文字发送给你配置的模型服务。
 账号用于登录 iTEST；程序不会将账号密码发送给模型服务。
 
@@ -60,7 +74,7 @@ Copy-Item config.example.yml config.yml
 在 Windows x64 上使用 Python 3.13、锁定依赖及 Inno Setup 6.7.3：
 
 ```powershell
-python -m unittest test_gui test_task_progress test_release test_exam_schema test_model_presets test_model_connections test_account_check test_browser_startup
+python -m unittest test_app_updates test_gui test_task_progress test_release test_exam_schema test_model_presets test_model_connections test_account_check test_browser_startup
 New-Item -ItemType Directory -Force .release-tools
 Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile .release-tools/MicrosoftEdgeWebview2Setup.exe
 .\build_release.ps1 -ISCC 'C:\path\to\ISCC.exe'

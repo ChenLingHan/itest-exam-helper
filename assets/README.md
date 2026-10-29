@@ -1,6 +1,8 @@
-# iTEST 标志
+# 应用原创图标
 
-来源：iTEST 官方网站 https://itestcloud.unipus.cn/ 引用的品牌图片
-https://itestres.unipus.cn/cms/saas-logo.png 。
+`app-icon.png` 是为本项目生成的原创“试卷与辅助星光”图形，不使用 iTEST 官方标志。
+`itest.ico` 从原创图形导出，包含 16–256 像素的七种尺寸；`itest-icon-32.png` 保留兼容文件名，实际为 64×64，用于高分屏的界面显示。
 
-`itest-logo.png` 为官方原图；`itest.ico` 和 `itest-icon-32.png` 由其左侧 iTEST 标志转换，供本地窗口、任务栏和启动快捷方式使用。
+官网使用同一原创图形。图形随本项目按 AGPL-3.0 提供；服务商品牌图标的独立许可见 `provider-icons-LICENSE.txt`。
+
+本项目是独立开源工具，未获得 iTEST 官方背书，产品名称与第三方商标仍归其各自权利人。
