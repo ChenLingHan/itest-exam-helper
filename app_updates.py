@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 """Public stable-release updates. Downloads are verified before explicit installation."""
 import copy
 import base64

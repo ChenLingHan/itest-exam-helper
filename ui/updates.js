@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 window.AppUpdates=(()=>{
   const $=id=>document.getElementById(id);
   let bridge,lastStatus=null,lastVersion=null;

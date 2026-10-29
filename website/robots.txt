@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 User-agent: *
 Allow: /
 Sitemap: https://chenlinghan.github.io/itest-exam-helper/sitemap.xml

@@ -2,6 +2,9 @@
 
 This application is derived from https://github.com/YDHusky/itest and is
 distributed under the GNU AGPL v3; see LICENSE. This is an independent project.
+Original contributions from commit acce45aff475a85c8f8db41439f7db602659376d
+are additionally available under LICENSE-MIT, within MIT-LICENSE-SCOPE.md.
+This additional grant does not relicense upstream or third-party content.
 The application icon is original to this project; see assets/README.md.
 The iTEST name and third-party marks belong to their respective owners.
 

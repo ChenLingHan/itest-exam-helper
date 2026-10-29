@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 import copy
 import base64
 import hashlib

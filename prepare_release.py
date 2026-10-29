@@ -9,7 +9,7 @@ FILES = ['app_paths.py', 'app_updates.py', 'test_app_updates.py', 'desktop_bridg
          'model_connections.py', 'test_model_connections.py', 'test_account_check.py', 'browser_startup.py', 'test_browser_startup.py', 'verify_frozen_protocol.py', 'model_presets.py', 'test_model_presets.py', 'MODEL_PRESETS.md', 'exam_schema.py', 'test_exam_schema.py', 'task_progress.py', 'itest.py', 'kimi_model.py', 'main.py', 'mp32str.py',
          'test_gui.py', 'test_task_progress.py', 'test_desktop_ui.py', 'test_close_ui.py',
          'requirements.txt', 'requirements-gui.txt', 'requirements-lock.txt',
-         'README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md', 'config.example.yml',
+         'README.md', 'LICENSE', 'LICENSE-MIT', 'MIT-LICENSE-SCOPE.md', 'THIRD_PARTY_NOTICES.md', 'config.example.yml',
          '.gitignore', 'iTEST.spec', 'installer.iss', 'build_release.ps1',
          'prepare_release.py', 'RELEASE_NOTES.md', 'test_release.py']
 

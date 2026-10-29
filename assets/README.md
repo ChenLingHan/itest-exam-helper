@@ -3,6 +3,6 @@
 `app-icon.png` 是为本项目生成的原创“试卷与辅助星光”图形，不使用 iTEST 官方标志。
 `itest.ico` 从原创图形导出，包含 16–256 像素的七种尺寸；`itest-icon-32.png` 保留兼容文件名，实际为 64×64，用于高分屏的界面显示。
 
-官网使用同一原创图形。图形随本项目按 AGPL-3.0 提供；服务商品牌图标的独立许可见 `provider-icons-LICENSE.txt`。
+官网使用同一原创图形。原创图形中 ChenLingHan 有权授权的部分另按 MIT 提供（见根目录 `LICENSE-MIT` 和 `MIT-LICENSE-SCOPE.md`）；服务商品牌图标的独立许可见 `provider-icons-LICENSE.txt`。
 
 本项目是独立开源工具，未获得 iTEST 官方背书，产品名称与第三方商标仍归其各自权利人。

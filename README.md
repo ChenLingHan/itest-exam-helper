@@ -2,6 +2,8 @@
 
 Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https://github.com/YDHusky/itest) 改进，采用 AGPL-3.0 许可证。非 iTEST 官方产品。
 
+v1.2.0 提交中的原创贡献另按 **MIT** 授权（含历史版本）；范围见 [MIT 授权说明](MIT-LICENSE-SCOPE.md)，完整条款见 [LICENSE-MIT](LICENSE-MIT)。上游代码和第三方内容保留原许可，完整应用仍按 AGPL-3.0 分发。
+
 官网：**https://chenlinghan.github.io/itest-exam-helper/**
 
 ## 下载安装

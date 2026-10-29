@@ -2,7 +2,7 @@
 from PyInstaller.utils.hooks import collect_all, collect_data_files, collect_submodules
 
 datas = [('ui', 'ui'), ('assets', 'assets'), ('model', 'model'),
-         ('lib/ffmpeg.exe', 'lib'), ('LICENSE', '.'),
+         ('lib/ffmpeg.exe', 'lib'), ('LICENSE', '.'), ('LICENSE-MIT', '.'), ('MIT-LICENSE-SCOPE.md', '.'),
          ('THIRD_PARTY_NOTICES.md', '.'), ('config.example.yml', '.')]
 binaries = []
 # Selenium 4.51 exposes drivers through importlib-based lazy imports.
