@@ -90,6 +90,30 @@ button.check-button.is-running{background:#f3f4f6;color:#5b6675;border-color:#d9
 .logs pre{font-size:12px;line-height:1.9;color:#667387}
 .log-empty{font-size:12px;color:#9aa4b1;padding:25px 8px;text-align:center}
 .status{color:#8c98a7}.notice{background:#fff;border-color:#dfe5ed}.task-card{background:#fff}
+.status,.check-detail,#connectionResult{display:none}
+.toast-region{position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:1000;width:min(410px,calc(100vw - 182px));display:grid;gap:10px;pointer-events:none}
+.toast{pointer-events:auto;display:flex;align-items:flex-start;gap:10px;padding:13px 14px;border:1px solid #cce8d6;border-radius:12px;background:#f7fff9;box-shadow:0 8px 30px #17263d1a;color:#245b38;animation:appear .2s ease}
+.toast.error{background:#fff8f7;border-color:#f1cdc9;color:#a12a20}
+.toast-mark{display:grid;place-items:center;flex-shrink:0;background:#e1f5e7;color:#15803d;border-radius:50%;width:23px;height:23px;font-weight:700}
+.toast.error .toast-mark{background:#ffe6e1;color:#b42318}
+.toast-text{flex:1;min-width:0;padding-top:2px;font-size:13px;white-space:pre-line;overflow-wrap:anywhere;max-height:40vh;overflow:auto}
+.toast-close{border:0;background:transparent;color:inherit;opacity:.6;font-size:20px;line-height:23px;padding:0 3px;border-radius:4px}
+.toast-close:hover{opacity:1;background:#00000008}
+.notice{position:fixed;z-index:1001;top:20px;right:24px;width:min(420px,calc(100vw - 182px));margin:0;padding:16px;box-shadow:0 8px 30px #17263d24;background:#fff;border:1px solid #d9e1ec;max-height:70vh;overflow:auto}
+.notice:before{content:'请确认';display:block;font-size:13px;font-weight:650;color:#334155;margin-bottom:7px}
+.notice-message{font-size:13px;line-height:1.7}
+.notice-actions{margin-top:14px}.notice-actions button{font-size:12px;padding:7px 13px}
+.check-progress{height:3px;margin-top:10px;border-radius:9px;overflow:hidden;background:#e6edf6}
+.check-progress>span{display:block;width:35%;height:100%;background:#658cbd;border-radius:9px;animation:checking 1.35s ease-in-out infinite}
+.check-button.is-running:before{content:'';width:12px;height:12px;border:1.5px solid #c5cfdb;border-top-color:#536f92;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+button.check-button.is-running:disabled{opacity:1}
+.provider-logo{width:21px;height:21px;stroke:none;fill:currentColor;overflow:visible}
+.provider-card:has(use[href='#i-settings']) .provider-logo{stroke:currentColor;fill:none;width:18px;height:18px}
+button.primary.is-saved{background:#15803d;border-color:#15803d;box-shadow:none}
+button.primary.is-saved:hover:not(:disabled){background:#166534;border-color:#166534}
+@keyframes checking{from{transform:translateX(-100%)}to{transform:translateX(385%)}}
+@media(prefers-reduced-motion:reduce){.check-progress>span{animation:none;width:100%;opacity:.6}.toast{animation:none}}
+@media(max-width:740px){.toast-region{width:min(320px,calc(100vw - 170px))}}
 @media(max-width:950px){.account-row,.model-form-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.account-row>.check-button,.model-form-row>.check-button{grid-column:1/-1;justify-self:start;margin-top:0;min-width:132px}.provider-card strong{font-size:11px}.provider-cards{gap:5px}.label-note{display:none}}
 @media(max-width:740px){.app{grid-template-columns:138px minmax(0,1fr)}header{padding-inline:20px}.content{padding-inline:18px;padding-top:16px}.form-section{padding:13px;margin-bottom:10px}.section-note{display:none}.provider-cards{grid-template-columns:repeat(3,minmax(0,1fr))}.section-heading{gap:8px}.readiness{gap:8px;font-size:9px}.model-footer{gap:4px}.advanced summary>span{display:none}.flow-guide{padding:9px;font-size:10px}.dock{margin-inline:18px}.caption{font-size:10px}}
 @media(max-height:600px){header{height:78px;min-height:0}.empty{min-height:155px;padding:10px 0}.flow-guide{margin-bottom:10px}.content{padding-top:12px;padding-bottom:12px}}

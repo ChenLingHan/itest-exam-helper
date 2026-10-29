@@ -4,6 +4,7 @@ import os
 import json
 from pathlib import Path
 import tempfile
+import threading
 import time
 from unittest.mock import MagicMock, patch
 import webview
@@ -46,6 +47,7 @@ def check(window,bridge):
         assert window.evaluate_js("document.querySelector('#page-settings .content').scrollHeight>=document.querySelector('#page-settings .content').clientHeight"), '设置页滚动异常'
         assert window.evaluate_js("document.querySelectorAll('input[type=password]').length===2"), '密码与密钥未遮蔽'
         assert window.evaluate_js("document.querySelectorAll('.provider-card').length===5 && document.querySelector('#provider').value==='custom'"), '预设目录或旧配置识别错误'
+        assert window.evaluate_js("document.querySelectorAll('.provider-card .provider-logo').length===5 && document.querySelectorAll('symbol[id^=brand-]').length===4"), '服务商图标未内置'
         window.evaluate_js("document.querySelector('#apikey').value='private-test-key'; [...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('DeepSeek')).click()")
         assert window.evaluate_js("document.querySelector('#apikey').value==='' && document.querySelector('#model').value==='deepseek-flash' && !document.querySelector('#model').readOnly"), '新平台携带了旧 Key 或模型被锁死'
         window.evaluate_js("document.querySelector('#model').value='my-deepseek-model';document.querySelector('#apikey').value='deepseek-private-test';[...document.querySelectorAll('.provider-card')].find(b=>b.textContent.includes('自定义')).click()")
@@ -85,6 +87,9 @@ def check(window,bridge):
         assert window.evaluate_js("document.querySelectorAll('.model-option').length===0 && document.querySelector('#modelPicker').hidden"), '修改接口后沿用了旧模型列表'
         assert 'deepseek-private-test' not in json.dumps(bridge.get_state()), '状态中泄露 Key'
         window.evaluate_js("document.querySelector('#testAccount').click()")
+        deadline=time.monotonic()+3
+        while time.monotonic()<deadline and window.evaluate_js("document.querySelector('#accountCheckProgress').hidden"): time.sleep(.03)
+        assert window.evaluate_js("!document.querySelector('#accountCheckProgress').hidden && document.querySelector('#testAccount').getAttribute('aria-busy')==='true'"), '登录验证没有加载条'
         deadline=time.monotonic()+5
         while time.monotonic()<deadline:
             if window.evaluate_js("document.querySelector('#accountTestResult').textContent.includes('登录测试通过')"): break
@@ -92,6 +97,9 @@ def check(window,bridge):
         assert window.evaluate_js("document.querySelector('#accountTestResult').textContent.includes('登录测试通过')"), 'iTEST 登录测试结果未显示'
         assert len(bridge.get_state()['papers'])==2, '登录测试改动了已有试卷列表'
         window.evaluate_js("document.querySelector('#testBrowser').click()")
+        deadline=time.monotonic()+3
+        while time.monotonic()<deadline and window.evaluate_js("document.querySelector('#browserCheckProgress').hidden"): time.sleep(.03)
+        assert window.evaluate_js("!document.querySelector('#browserCheckProgress').hidden"), '浏览器检查没有加载条'
         deadline=time.monotonic()+5
         while time.monotonic()<deadline:
             if window.evaluate_js("document.querySelector('#browserTestResult').textContent.includes('Edge 启动检查通过')"): break
@@ -105,6 +113,7 @@ def check(window,bridge):
         window.evaluate_js("document.querySelector('#password').value='changed-password';document.querySelector('#password').dispatchEvent(new Event('input'))")
         assert window.evaluate_js("!document.querySelector('#testAccount').classList.contains('is-success') && document.querySelector('#testBrowser').classList.contains('is-success')"), '修改密码后错误沿用绿色登录状态'
         window.evaluate_js("document.querySelector('#testModel').click()")
+        assert window.evaluate_js("!document.querySelector('#modelCheckProgress').hidden && document.querySelector('#testModel').getAttribute('aria-busy')==='true'"), '模型验证没有加载条'
         deadline=time.monotonic()+5
         while time.monotonic()<deadline:
             if window.evaluate_js("document.querySelector('#testModel').classList.contains('is-success')"): break
@@ -116,6 +125,30 @@ def check(window,bridge):
             if window.evaluate_js("document.querySelector('#connectionResult').textContent.includes('已保存')"): break
             time.sleep(.05)
         assert window.evaluate_js("document.querySelector('#testModel').classList.contains('is-success')"), '保存相同配置后丢失成功状态'
+        assert window.evaluate_js("document.querySelector('#savedConnections').hidden && !document.querySelector('#connectionName').value.includes('原有模型配置')"), '单套配置仍显示多余名称'
+        notice_id=bridge._notice_id
+        assert window.evaluate_js("document.querySelector('#save').click();document.querySelector('#save').click();document.querySelector('#save').getAttribute('aria-busy')==='true'"), '保存时没有忙碌反馈'
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline and not window.evaluate_js("document.querySelector('#save').classList.contains('is-saved')"): time.sleep(.05)
+        assert window.evaluate_js("document.querySelector('#save').classList.contains('is-saved') && document.querySelector('#save').textContent==='已保存'"), '保存成功按钮没有变绿'
+        assert bridge._notice_id==notice_id+1, '重复点击产生重复保存'
+        assert window.evaluate_js("[...document.querySelectorAll('.toast-text')].some(el=>el.textContent.includes('全部设置已保存')) && document.querySelector('.toast-region').getBoundingClientRect().top<50"), '全部保存没有顶部成功提示'
+        for name in ['model','apikey','password']:
+            window.evaluate_js(f"document.querySelector('#{name}').dispatchEvent(new Event('input',{{bubbles:true}}))")
+        assert window.evaluate_js("document.querySelector('#save').classList.contains('is-saved') && document.querySelector('#testModel').classList.contains('is-success')"), '未改变内容却清除了成功状态'
+        time.sleep(4.6);bridge._touch();time.sleep(.4)
+        assert window.evaluate_js("![...document.querySelectorAll('.toast-text')].some(el=>el.textContent.includes('全部设置已保存')) && document.querySelector('#save').classList.contains('is-saved')"), '消息没有自动消失或保存按钮随提示重置'
+        window.evaluate_js("navigate('logs')");time.sleep(.45);window.evaluate_js("navigate('settings')");time.sleep(.45)
+        assert window.evaluate_js("document.querySelector('#save').classList.contains('is-saved') && document.querySelector('#testModel').classList.contains('is-success')"), '切换页面重置了成功状态'
+        original_name=window.evaluate_js("document.querySelector('#connectionName').value")
+        window.evaluate_js("document.querySelector('#connectionName').value+='-edit';document.querySelector('#connectionName').dispatchEvent(new Event('input',{bubbles:true}))")
+        assert window.evaluate_js("!document.querySelector('#save').classList.contains('is-saved') && document.querySelector('#save').textContent==='保存更改' && document.querySelector('#testModel').classList.contains('is-success')"), '更改配置名称错误影响验证状态'
+        window.evaluate_js("document.querySelector('#connectionName').value="+json.dumps(original_name)+";document.querySelector('#connectionName').dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#username').value='';document.querySelector('#username').dispatchEvent(new Event('input',{bubbles:true}));document.querySelector('#save').click()")
+        deadline=time.monotonic()+5
+        while time.monotonic()<deadline and not bridge.get_state().get('notice',{}).get('error'):time.sleep(.05)
+        time.sleep(.3)
+        assert window.evaluate_js("document.querySelector('.toast.error')!==null && !document.querySelector('#save').classList.contains('is-saved')"), '保存失败被错误显示为成功'
+        window.evaluate_js("document.querySelector('#username').value='offline-test';document.querySelector('#username').dispatchEvent(new Event('input',{bubbles:true}))")
         window.evaluate_js("document.querySelector('#model').value='changed-model';document.querySelector('#model').dispatchEvent(new Event('input'))")
         assert window.evaluate_js("!document.querySelector('#testModel').classList.contains('is-success')"), '更换模型后沿用旧验证结果'
         assert bridge._pending is None
@@ -142,9 +175,9 @@ def check(window,bridge):
         bridge._notice('答案已填写，尚未交卷，请在浏览器中检查。')
         deadline=time.monotonic()+5
         while time.monotonic()<deadline:
-            if window.evaluate_js("!document.getElementById('notice').hidden"): break
+            if window.evaluate_js("[...document.querySelectorAll('.toast-text')].some(el=>el.textContent.includes('尚未交卷'))"): break
             time.sleep(.2)
-        assert window.evaluate_js("document.getElementById('notice').getBoundingClientRect().bottom<=innerHeight && document.querySelector('.dock').hidden"), '完成提示与任务进度挤压操作区'
+        assert window.evaluate_js("document.querySelector('.toast-region').getBoundingClientRect().top<50 && document.querySelector('.dock').hidden && document.getElementById('notice').hidden"), '完成提示没有改为顶部浮动消息'
         bridge._task.finish(True)
         bridge._state.update(completed=False,task=bridge._task.snapshot(),blocked_paper_ids=['123'])
         bridge._state['papers'][0]['canKaoshiJudgeBean']={'kaoshiBtnInfo':'已交卷'}
@@ -184,9 +217,18 @@ if __name__=='__main__':
         bridge._session=bridge._config.copy()
         bridge._process=MagicMock()
         bridge._state.update(page='papers',connected=True,papers=[{'ksdId':'123','ksName':'示例英语听力'}, {'ksdId':'456','ksName':'<img src=x onerror=window.injected=1>'}])
-        html=(ROOT/'ui/index.html').read_text(encoding='utf-8').replace('__APP_STYLES__',(ROOT/'ui/app.css').read_text(encoding='utf-8')).replace('__MODEL_SETTINGS_SCRIPT__',(ROOT/'ui/model-settings.js').read_text(encoding='utf-8')).replace('__ITEST_ICON__','data:image/png;base64,'+base64.b64encode((ROOT/'assets/itest-icon-32.png').read_bytes()).decode())
+        html=(ROOT/'ui/index.html').read_text(encoding='utf-8').replace('__APP_STYLES__',(ROOT/'ui/app.css').read_text(encoding='utf-8')).replace('__NOTIFICATIONS_SCRIPT__',(ROOT/'ui/notifications.js').read_text(encoding='utf-8')).replace('__MODEL_SETTINGS_SCRIPT__',(ROOT/'ui/model-settings.js').read_text(encoding='utf-8')).replace('__ITEST_ICON__','data:image/png;base64,'+base64.b64encode((ROOT/'assets/itest-icon-32.png').read_bytes()).decode())
         test_width,test_height=map(int,os.environ.get('ITEST_UI_TEST_SIZE','680x480').split('x'))
         window=webview.create_window('iTEST offline UI check',html=html,js_api=bridge,width=test_width,height=test_height,hidden=True)
-        with patch('desktop_bridge.model_tool',side_effect=lambda value,kind:{'ok':True,'models':['deepseek-flash','deepseek-v4-pro'],'message':'已获取 2 个模型'} if kind=='models' else {'ok':True,'message':'模型连接验证通过'}), patch.object(bridge,'_send',side_effect=lambda command: bridge._event(bridge._process,{'event':'account-test','request_id':command['request_id'],'ok':True,'message':'Edge 启动检查通过' if command['action']=='check_browser' else '登录测试通过，可读取试卷列表。'}) if command['action'] in ('check_login','check_browser') else None):
+        def fake_model(value,kind):
+            time.sleep(.65)
+            return {'ok':True,'models':['deepseek-flash','deepseek-v4-pro'],'message':'已获取 2 个模型'} if kind=='models' else {'ok':True,'message':'模型连接验证通过'}
+        def fake_send(command):
+            if command['action'] in ('check_login','check_browser'):
+                def finish():
+                    time.sleep(.65)
+                    bridge._event(bridge._process,{'event':'account-test','request_id':command['request_id'],'ok':True,'message':'Edge 启动检查通过' if command['action']=='check_browser' else '登录测试通过，可读取试卷列表。'})
+                threading.Thread(target=finish,daemon=True).start()
+        with patch('desktop_bridge.model_tool',side_effect=fake_model), patch.object(bridge,'_send',side_effect=fake_send):
             webview.start(check,(window,bridge),gui='edgechromium',private_mode=True)
     raise SystemExit(bool(errors))

@@ -43,7 +43,7 @@ class Connections:
                 raise ValueError('模型连接编号重复。')
             self.data=data
         elif legacy.get('apikey'):
-            self.data['connections']=[{'id':'migrated','name':'原有模型配置','ai':deepcopy(legacy)}]
+            self.data['connections']=[{'id':'migrated','name':'我的模型','ai':deepcopy(legacy)}]
             self.data['active_id']='migrated'
             self._write(self.data)
 

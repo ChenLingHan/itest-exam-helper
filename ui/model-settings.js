@@ -6,6 +6,7 @@ window.ModelSettings = (() => {
   let models=[], appliedRequest=null, accountRequest=null, accountSignature=null, accountKind=null;
   const checks={browser:{state:'idle',detail:''},account:{state:'idle',detail:''},model:{state:'idle',detail:''}};
   const drafts=new Map();
+  let lastModelInput=null,lastAccountInput=null;
   const ai=()=>({provider:$('provider').value,base_url:$('base_url').value,model:$('model').value,apikey:$('apikey').value});
   const snapshot=()=>({ai:ai(),name:$('connectionName').value});
   const signature=(kind=requestKind)=>JSON.stringify(kind==='models'?{provider:ai().provider,base_url:ai().base_url,apikey:ai().apikey}:ai());
@@ -15,7 +16,8 @@ window.ModelSettings = (() => {
   function clearModels(){models=[];$('modelSearch').value='';$('modelOptions').replaceChildren();$('toggleModels').disabled=locked||!ai().apikey.trim();$('toggleModels').textContent='获取模型';showModels(false)}
   const draftKey=()=>selectedId?'saved:'+selectedId:'preset:'+$('provider').value;
   const remember=()=>drafts.set(draftKey(),snapshot());
-  function message(text,error=false){$('connectionResult').textContent=text;$('connectionResult').style.color=error?'#b42318':'';}
+  function message(text,error=false){$('connectionResult').textContent=text;Notifications.show(text,{error});}
+  const displayName=(name,provider)=>name==='原有模型配置'?(presets.find(p=>p.id===provider)?.label||'我的模型'):name;
   function renderChecks(){
     const config=[['browser','testBrowser','browserTestResult','browserReady','检查浏览器','✓ 浏览器正常','停止检查','重新检查','浏览器'],['account','testAccount','accountTestResult','accountReady','验证登录','✓ 登录已通过','停止验证','重新验证','账号'],['model','testModel','modelToolResult','modelReady','验证模型','✓ 模型可用','验证中…','重新验证','模型']];
     for(const [key,buttonId,resultId,readyId,idle,passed,running,error,label] of config){
@@ -24,6 +26,8 @@ window.ModelSettings = (() => {
       button.textContent=check.state==='passed'?passed:check.state==='running'?running:check.state==='error'?error:idle;
       button.title=check.detail||(key==='model'?'发送少量请求验证模型，可能消耗 Token':'可随时点击重新检查');
       button.setAttribute('aria-label',label+'：'+(check.state==='passed'?'已通过':check.state==='running'?'正在检查':check.state==='error'?'未通过':'待检查'));
+      button.setAttribute('aria-busy',String(check.state==='running'));
+      $(key+'CheckProgress').hidden=check.state!=='running';
       if(key!=='model'||check.state!=='idle'){
         $(resultId).textContent=check.detail;$(resultId).className='check-detail '+(check.state==='passed'?'success':check.state==='error'?'error':'');
       }
@@ -36,24 +40,27 @@ window.ModelSettings = (() => {
     const previous=JSON.stringify(ai());
     for(const k of ['provider','base_url','model','apikey']) $(k).value=value.ai[k]??(k==='provider'?'custom':'');
     if(!presets.some(p=>p.id===$('provider').value))$('provider').value='custom';
-    $('connectionName').value=value.name;
+    $('connectionName').value=displayName(value.name,$('provider').value);
     $('base_url').readOnly=false;$('model').readOnly=false;
     $('advanced').open=$('provider').value==='custom';
     if(previous!==JSON.stringify(ai()))resetModelCheck();
+    lastModelInput=JSON.stringify(ai());
     const preset=presets.find(p=>p.id===$('provider').value);
     $('providerHint').textContent=(preset?.hint||'使用兼容 OpenAI Chat Completions 的接口。')+' 模型和接口均可修改。';
     $('modelName').textContent=$('model').value||'选择模型';
     clearModels();
     $('modelToolResult').textContent='';requestId=null;requestSignature=null;
     renderCards();renderSaved();
+    $('page-settings').dispatchEvent(new Event('change'));
   }
   function selectPreset(id,fresh=false){
     if(locked||changing)return;
+    if(!fresh&&id===$('provider').value)return;
     remember();selectedId=null;
     const preset=presets.find(p=>p.id===id);
     fill(!fresh&&drafts.has('preset:'+id)?drafts.get('preset:'+id):{
       name:preset.label,ai:{provider:id,base_url:preset.base_url,model:preset.model,apikey:''}});
-    message('新配置，填写后保存设置');
+    $('connectionResult').textContent='';
   }
   function renderCards(){
     $('providerCards').replaceChildren();
@@ -61,15 +68,18 @@ window.ModelSettings = (() => {
       const card=document.createElement('button');card.type='button';card.className='provider-card'+($('provider').value===p.id?' active':'');
       card.disabled=locked||changing;card.setAttribute('aria-pressed',String($('provider').value===p.id));card.title=p.hint||'填写自己的模型服务地址';
       const title=document.createElement('strong');title.textContent=p.id==='custom'?'自定义':p.id==='kimi'?'Kimi':p.id==='zhipu'?'GLM':p.label;
-      card.append(title);card.onclick=()=>selectPreset(p.id);$('providerCards').append(card);
+      const logo=document.createElementNS('http://www.w3.org/2000/svg','svg');logo.classList.add('provider-logo');logo.setAttribute('aria-hidden','true');
+      const use=document.createElementNS(logo.namespaceURI,'use');use.setAttribute('href',p.id==='custom'?'#i-settings':'#brand-'+p.id);logo.append(use);
+      card.append(logo,title);card.onclick=()=>selectPreset(p.id);$('providerCards').append(card);
     }
   }
   function renderSaved(){
     $('savedConnections').replaceChildren();
+    $('savedConnections').hidden=!catalog.connections.length||(catalog.connections.length===1&&selectedId!==null);
     for(const row of catalog.connections){
       const button=document.createElement('button');button.type='button';button.className='connection-card'+(selectedId===row.id?' active':'');
       button.disabled=locked||changing;button.setAttribute('aria-pressed',String(selectedId===row.id));
-      const name=document.createElement('strong');name.textContent=row.name;
+      const name=document.createElement('strong');name.textContent=displayName(row.name,row.provider);
       const detail=document.createElement('small');detail.textContent=row.model+(catalog.active_id===row.id?' · 当前使用':'');button.append(name,detail);
       button.onclick=async()=>{
         if(changing||locked)return;remember();changing=true;
@@ -85,14 +95,14 @@ window.ModelSettings = (() => {
     }
     if(!catalog.connections.length){const p=document.createElement('p');p.className='provider-hint';p.textContent='选择服务商，填写密钥后保存即可。';$('savedConnections').append(p)}
   }
-  async function save(){
+  async function save({silent=false}={}){
     if(locked||changing)return false;changing=true;$('saveConnection').disabled=true;
     try{
       const result=await api.change_connection('save',{id:selectedId,name:$('connectionName').value,ai:ai()});
       if(!result.ok){message(result.message,true);return false;}
       selectedId=result.selected.id;catalog=result.catalog;
       fill({name:result.selected.name,ai:result.selected.ai});remember();
-      message('模型配置已保存');return true;
+      if(!silent)message('模型配置已保存');return true;
     }catch(_){message('保存失败，请重试。',true);return false}finally{changing=false;$('saveConnection').disabled=locked;renderSaved();renderCards()}
   }
   async function runTool(kind){
@@ -101,10 +111,10 @@ window.ModelSettings = (() => {
     try{
       const result=await api.start_model_tool(kind,ai());
       if(signature(kind)!==initial)return;
-      if(!result.ok){if(kind==='test'){checks.model={state:'error',detail:result.message};renderChecks()}else{$('modelToolResult').textContent=result.message;$('modelToolResult').className='check-detail error'}return;}
+      if(!result.ok){Notifications.show(result.message,{error:true});if(kind==='test'){checks.model={state:'error',detail:result.message};renderChecks()}else{$('modelToolResult').textContent=result.message;$('modelToolResult').className='check-detail error'}return;}
       requestId=result.request_id;requestSignature=initial;requestKind=kind;
       update(await api.get_state());
-    }catch(_){if(kind==='test'){checks.model={state:'error',detail:'请求未完成，请重试。'};renderChecks()}else{$('modelToolResult').textContent='请求未完成，请重试。'}}
+    }catch(_){Notifications.show('请求未完成，请重试。',{error:true});if(kind==='test'){checks.model={state:'error',detail:'请求未完成，请重试。'};renderChecks()}else{$('modelToolResult').textContent='请求未完成，请重试。'}}
   }
   function update(state){
     locked=Boolean(state.busy);const tool=state.model_tools||{};
@@ -115,6 +125,7 @@ window.ModelSettings = (() => {
     if(account.busy){const key=account.browser_only?'browser':'account';checks[key].state='running'}
     if(account.request_id===accountRequest&&(accountKind==='browser'||accountSignature===JSON.stringify(accountValue()))&&!account.busy){
       checks[accountKind]={state:account.ok?'passed':'error',detail:account.message||''};
+      Notifications.show(account.message||'检查已结束',{error:!account.ok,key:'account:'+account.request_id});
       if(accountKind==='account'&&account.ok)checks.browser={state:'passed',detail:'已在本次登录验证中成功启动浏览器'};
       accountRequest=null;
     }
@@ -123,6 +134,7 @@ window.ModelSettings = (() => {
     for(const id of ['newConnection','saveConnection','connectionName','fetchModels','testModel']) $(id).disabled=locked||(changing&&id!=='connectionName')||(Boolean(tool.busy)&&['fetchModels','testModel'].includes(id));
     if(tool.request_id===requestId&&requestSignature===signature()&&!tool.busy&&tool.request_id!==appliedRequest){
       appliedRequest=tool.request_id;
+      Notifications.show(tool.message||'请求已完成',{error:!tool.ok,key:'model:'+tool.request_id});
       $('modelToolResult').textContent=tool.message||'';
       $('modelToolResult').className='check-detail '+(tool.ok?'success':'error');
       if(tool.kind==='test'){checks.model={state:tool.ok?'passed':'error',detail:tool.message||''};renderChecks()}
@@ -136,20 +148,21 @@ window.ModelSettings = (() => {
   }
   async function init(value,bridge){
     api=bridge;
+    lastAccountInput=JSON.stringify({username:value.username??'',password:value.password??''});
     presets=[...await api.get_model_presets(),{id:'custom',label:'自定义兼容接口',category:'custom',aliases:'custom 中转 代理 自定义',base_url:'',model:''}];
     for(const p of presets){const option=document.createElement('option');option.value=p.id;option.textContent=p.label;$('provider').append(option)}
     catalog=await api.get_connections();selectedId=catalog.active_id;
     const row=catalog.connections.find(c=>c.id===selectedId);
     const provider=value.ai?.provider||(presets.find(p=>p.base_url.replace(/\/$/,'')===(value.ai?.base_url||'').replace(/\/$/,'')&&p.model===value.ai?.model)?.id||'custom');
     fill({name:row?.name||presets.find(p=>p.id===provider)?.label||'我的连接',ai:{...value.ai,provider}});
-    $('newConnection').onclick=()=>selectPreset($('provider').value,true);$('saveConnection').onclick=save;
+    $('newConnection').onclick=()=>selectPreset($('provider').value,true);$('saveConnection').onclick=()=>save();
     $('fetchModels').onclick=()=>runTool('models');$('testModel').onclick=()=>runTool('test');
     $('toggleModels').onclick=()=>models.length?showModels($('modelPicker').hidden):runTool('models');
     $('modelSearch').oninput=renderModels;
     $('modelPicker').addEventListener('keydown',event=>{if(event.key==='Escape'){showModels(false);$('toggleModels').focus()}});
-    for(const id of ['apikey','base_url']) $(id).addEventListener('input',()=>{requestId=null;requestSignature=null;clearModels();$('toggleModels').disabled=locked||!ai().apikey.trim();$('modelToolResult').textContent='';resetModelCheck()});
-    $('model').addEventListener('input',()=>{if(requestKind==='test'){requestId=null;requestSignature=null;$('modelToolResult').textContent=''}$('modelName').textContent=$('model').value||'选择模型';resetModelCheck();renderModels()});
-    for(const id of ['username','password'])$(id).addEventListener('input',()=>{if(accountKind==='account'){accountRequest=null;accountSignature=null}checks.account={state:'idle',detail:''};renderChecks()});
+    for(const id of ['apikey','base_url']) $(id).addEventListener('input',()=>{const current=JSON.stringify(ai());if(current===lastModelInput)return;lastModelInput=current;requestId=null;requestSignature=null;clearModels();$('toggleModels').disabled=locked||!ai().apikey.trim();$('modelToolResult').textContent='';resetModelCheck()});
+    $('model').addEventListener('input',()=>{const current=JSON.stringify(ai());if(current===lastModelInput)return;lastModelInput=current;if(requestKind==='test'){requestId=null;requestSignature=null;$('modelToolResult').textContent=''}$('modelName').textContent=$('model').value||'选择模型';resetModelCheck();renderModels()});
+    for(const id of ['username','password'])$(id).addEventListener('input',()=>{const current=JSON.stringify(accountValue());if(current===lastAccountInput)return;lastAccountInput=current;if(accountKind==='account'){accountRequest=null;accountSignature=null}checks.account={state:'idle',detail:''};renderChecks()});
     const runAccountCheck=async(browserOnly=false)=>{
       try{
         const state=await api.get_state();
@@ -157,14 +170,14 @@ window.ModelSettings = (() => {
         const value=accountValue();const initial=JSON.stringify(value);
         const key=browserOnly?'browser':'account';checks[key]={state:'running',detail:browserOnly?'正在准备驱动并打开 Edge…':'正在验证登录，如出现验证码，请在浏览器中完成。'};renderChecks();
         const result=browserOnly?await api.start_browser_test():await api.start_account_test(value);
-        if(JSON.stringify(accountValue())!==initial)return;
-        if(!result.ok){checks[key]={state:'error',detail:result.message};renderChecks();return;}
+        if(!browserOnly&&JSON.stringify(accountValue())!==initial)return;
+        if(!result.ok){Notifications.show(result.message,{error:true});checks[key]={state:'error',detail:result.message};renderChecks();return;}
         accountRequest=result.request_id;accountSignature=initial;accountKind=key;update(await api.get_state());
-      }catch(_){checks[browserOnly?'browser':'account']={state:'error',detail:'检查未能启动，请重试。'};renderChecks()}
+      }catch(_){Notifications.show('检查未能启动，请重试。',{error:true});checks[browserOnly?'browser':'account']={state:'error',detail:'检查未能启动，请重试。'};renderChecks()}
     };
     $('testAccount').onclick=()=>runAccountCheck(false);
     $('testBrowser').onclick=()=>runAccountCheck(true);
 
   }
-  return {init,update,saveForSettings:()=>ai().apikey?save():Promise.resolve(true)};
+  return {init,update,saveForSettings:()=>ai().apikey?save({silent:true}):Promise.resolve(true)};
 })();

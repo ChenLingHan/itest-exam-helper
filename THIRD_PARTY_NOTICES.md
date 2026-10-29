@@ -24,3 +24,8 @@ The complete FFmpeg build configuration can be inspected using
 
 Microsoft Edge and WebView2 are Microsoft components installed separately on
 Windows. Selenium Manager downloads a compatible Edge driver on first use.
+
+The embedded DeepSeek, OpenAI, GLM (Zhipu), and Kimi brand symbols are from
+LobeHub Icons (MIT): https://github.com/lobehub/lobe-icons
+Source revision: 8b7bbc433d38437fa2b0cca58ae896917162b812
+See assets/provider-icons-LICENSE.txt. Brand names and marks belong to their owners.

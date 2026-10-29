@@ -200,7 +200,7 @@ class Bridge:
                     temp=self._root/'config.yml.tmp'
                     temp.write_text(yaml.safe_dump(config,allow_unicode=True,sort_keys=False),encoding='utf-8')
                     temp.replace(self._root/'config.yml'); self._config=config
-                    self._notice('设置已保存，重新获取试卷后生效。')
+                    self._notice('全部设置已保存，重新获取试卷后生效。')
                 elif action=='load':
                     # 未保存的表单配置也可用于本次登录。
                     config=self._normalize(command.get('config',self._config))
