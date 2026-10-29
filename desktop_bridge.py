@@ -60,6 +60,12 @@ class Bridge:
         self._config={'username':'','password':'','sleep_time':10,'ai':{'provider':'deepseek','base_url':'https://api.deepseek.com','model':'deepseek-flash','apikey':''}}
         self._state={'version':0,'activity':'idle','busy':False,'stopping':False,'connected':False,'papers':[],
             'account_test':{'busy':False},'model_tools':{'busy':False},'logs':[],'status':'准备就绪','notice':None,'progress':None,'task':None,'page':'papers','completed':False,'blocked_paper_ids':[]}
+        self._state['always_on_top']=True
+        try:
+            preference=json.loads((self._root/'window_settings.json').read_text(encoding='utf-8'))
+            if isinstance(preference,dict) and type(preference.get('always_on_top')) is bool:
+                self._state['always_on_top']=preference['always_on_top']
+        except (OSError,ValueError): pass
         try:
             file=self._root/'config.yml'
             if file.exists():
@@ -151,6 +157,39 @@ class Bridge:
     def get_connections(self):
         with self._lock:
             return self._connections.summary() if self._connections else {'active_id':None,'connections':[]}
+
+    def set_always_on_top(self,enabled):
+        if type(enabled) is not bool:
+            return {'ok':False,'message':'窗口置顶设置无效。'}
+        # Applying a native window property may synchronously call the UI thread.
+        # Do not hold the state lock while waiting for that thread.
+        with self._lock:
+            previous=self._state['always_on_top']
+            if self._window is None:
+                return {'ok':False,'message':'窗口尚未就绪，请稍后重试。'}
+        try:
+            self._apply_window_on_top(enabled)
+            with self._lock:
+                temp=self._root/'window_settings.json.tmp'
+                temp.write_text(json.dumps({'always_on_top':enabled}),encoding='utf-8')
+                temp.replace(self._root/'window_settings.json')
+                self._state['always_on_top']=enabled
+                self._touch()
+            return {'ok':True}
+        except Exception:
+            try: self._apply_window_on_top(previous)
+            except Exception: pass
+            return {'ok':False,'message':'窗口置顶设置未能应用或保存，请重试。'}
+
+    def _apply_window_on_top(self,enabled):
+        if os.name=='nt' and getattr(self._window,'gui',None) is not None:
+            from webview.platforms.winforms import BrowserView
+            from System import Func, Type
+            native=BrowserView.instances.get(self._window.uid)
+            if native is not None:
+                native.Invoke(Func[Type](lambda:setattr(self._window,'on_top',enabled)))
+                return
+        self._window.on_top=enabled
 
     def get_connection(self,key):
         """Read a saved provider without activating it or writing settings."""

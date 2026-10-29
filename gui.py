@@ -54,7 +54,7 @@ def main():
     html=html.replace('__ITEST_ICON__','data:image/png;base64,'+logo)
     width,height,minimum=initial_window_size(*screen_work_area())
     window=webview.create_window('iTEST',html=html,js_api=api,width=width,height=height,min_size=minimum,hidden=smoke,
-        background_color='#ffffff',text_select=True,confirm_close=False)
+        background_color='#ffffff',text_select=True,confirm_close=False,on_top=api.get_state()['always_on_top'])
     api._window=window
     window.events.closing+=api._on_closing
     def check():
@@ -69,6 +69,21 @@ def main():
                     break
                 time.sleep(.1)
             else: raise RuntimeError('New settings layout did not finish loading')
+            # Verify the Windows topmost style as well as the saved preference.
+            from webview.platforms.winforms import BrowserView
+            native=BrowserView.instances[window.uid]
+            if not native.TopMost or not window.evaluate_js("document.getElementById('alwaysOnTop').checked"):
+                raise RuntimeError('Default topmost state missing')
+            for enabled in (False,True):
+                window.evaluate_js("document.getElementById('alwaysOnTop').click()")
+                deadline=time.monotonic()+5
+                while time.monotonic()<deadline:
+                    if api.get_state()['always_on_top']==enabled and not window.evaluate_js("document.getElementById('alwaysOnTop').disabled"):
+                        break
+                    time.sleep(.1)
+                else: raise RuntimeError('Topmost switch did not finish')
+                if native.TopMost!=enabled or Bridge(api._root).get_state()['always_on_top']!=enabled:
+                    raise RuntimeError('Native topmost switch or persistence failed')
             if not window.evaluate_js("typeof AppUpdates==='object' && document.getElementById('appVersion').textContent==="+json.dumps('v'+VERSION)+" && document.querySelector('.brand img').naturalWidth===64"):
                 raise RuntimeError('Update controls or high-DPI app icon missing')
             if not window.evaluate_js("Notifications.backend({id:-1,text:'界面自检',confirm:true,label:'继续',error:false});(()=>{const d=document.getElementById('notice'),r=d.getBoundingClientRect();return d.matches(':modal')&&Math.abs(r.x+r.width/2-innerWidth/2)<2&&Math.abs(r.y+r.height/2-innerHeight/2)<2})()"):
@@ -77,7 +92,7 @@ def main():
             api._send({'action':'close'})
             process=api._process
             if process and process.wait(timeout=20)!=0: raise RuntimeError('Worker failed')
-            report={'ok':True,'webview2':True,'worker_pipe':True,'centered_modal':True,'blank_config':not api._config['username']}
+            report={'ok':True,'webview2':True,'worker_pipe':True,'centered_modal':True,'topmost_toggle':True,'blank_config':not api._config['username']}
         except Exception as error:
             report={'ok':False,'error':str(error)}
         finally:

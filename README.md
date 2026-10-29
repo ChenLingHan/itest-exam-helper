@@ -6,13 +6,15 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 
 ## 下载安装
 
-在 [Releases](https://github.com/ChenLingHan/itest-exam-helper/releases/tag/v1.2.1) 下载 `iTEST-Exam-Helper-1.2.1-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
+在 [Releases](https://github.com/ChenLingHan/itest-exam-helper/releases/tag/v1.2.2) 下载 `iTEST-Exam-Helper-1.2.2-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
 
 - 支持 Windows 10/11 64 位（x64），无需安装 Python 或手动安装依赖。
 - 内置英语离线语音模型及 FFmpeg。
 - 请安装 Microsoft Edge；缺少 WebView2 时，安装程序会提示安装 Microsoft 官方组件，需要联网。
 - 首次获取试卷时，Selenium Manager 会联网下载与 Edge 匹配的驱动。
 - 安装包未进行代码签名。发布页附 SHA256SUMS.txt，可用于核对下载文件。
+
+窗口默认置顶，Edge 打开时软件仍显示在其上方。可随时通过左下角“窗口置顶”开关取消；选择会自动保存，下次启动继续生效。
 
 ## 首次使用
 
