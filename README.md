@@ -6,7 +6,7 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 
 ## 下载安装
 
-在 [Releases](https://github.com/ChenLingHan/itest-exam-helper/releases/tag/v1.2.0) 下载 `iTEST-Exam-Helper-1.2.0-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
+在 [Releases](https://github.com/ChenLingHan/itest-exam-helper/releases/tag/v1.2.1) 下载 `iTEST-Exam-Helper-1.2.1-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
 
 - 支持 Windows 10/11 64 位（x64），无需安装 Python 或手动安装依赖。
 - 内置英语离线语音模型及 FFmpeg。
@@ -33,6 +33,7 @@ Windows 桌面版 iTEST 英语考试辅助工具，基于 [YDHusky/itest](https:
 
 发布包中的账号、密码和密钥均为空，不包含开发者的配置、录音、试卷、截图或浏览器会话。
 安装版将设置保存在 `%LOCALAPPDATA%\iTEST-Exam-Helper\config.yml`，缓存和日志位于同目录 `.exam_work`。
+后台无法启动时，v1.2.1 会显示具体原因和系统编号，启动诊断位于 `.exam_work\startup.log`，只记录异常类型与编号，不记录账号、密码或密钥。可反馈该编号帮助排查；无需发送配置文件。
 独立模型连接保存在同一数据目录的 `model_connections.yml`，保存的连接文件也含明文密钥。
 设置以明文保存在当前 Windows 用户目录中，请勿分享该文件或整个数据目录。
 卸载程序保留设置及缓存；如需清理，可在退出程序后自行删除上述数据目录。

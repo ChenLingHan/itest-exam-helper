@@ -13,10 +13,15 @@ from task_progress import TaskProgress
 from model_presets import get_presets, normalize_ai, infer_provider
 from model_connections import Connections, checked_ai, model_tool, tool_error
 import uuid
+import datetime
 from app_paths import DATA_ROOT, RESOURCE_ROOT, worker_command
 from app_updates import UpdateManager, WEBSITE_URL, start_installer_after_exit
 
 ROOT = DATA_ROOT
+
+
+class WorkerStartError(RuntimeError):
+    """A startup failure whose message is safe to show without credentials."""
 
 
 def validate_config(config, need_ai=False):
@@ -43,6 +48,7 @@ class Bridge:
         self._root.mkdir(parents=True, exist_ok=True)
         self._lock=threading.RLock()
         self._process=None
+        self._worker_failure_message=None
         self._window=None
         self._session=None
         self._pending=None
@@ -192,11 +198,13 @@ class Bridge:
                 return {'ok':True,'request_id':request_id}
             except ValueError as error:
                 return {'ok':False,'message':str(error)}
-            except Exception:
+            except Exception as error:
+                message=str(error) if isinstance(error,WorkerStartError) else self._worker_failure(error=error)
                 self._state.update(busy=False,activity='idle')
-                self._state['account_test']={'busy':False,'ok':False,'message':'后台启动失败，请检查运行环境。'}
+                self._state['account_test']={'busy':False,'ok':False,'message':message}
+                self._state['status']=message
                 self._touch()
-                return {'ok':False,'message':'后台启动失败，请检查运行环境。'}
+                return {'ok':False,'message':message}
 
     def start_model_tool(self,kind,value):
         with self._lock:
@@ -341,30 +349,65 @@ class Bridge:
         self._state['task']=self._task.snapshot()
         self._state.update(busy=True,activity='running',status='正在处理所选试卷…',progress=None,completed=False)
         try: self._send(payload)
-        except Exception:
+        except Exception as error:
             self._state['busy']=False
             self._state['activity']='idle'
-            self._task.fail('后台任务启动失败，请检查运行环境。')
+            self._task.fail(str(error) if isinstance(error,WorkerStartError) else '后台任务启动失败，请查看运行记录。')
             self._state['task']=self._task.snapshot()
             raise
 
     def _send(self,command):
-        if self._process is None or self._process.poll() is not None:
-            self._process=subprocess.Popen(worker_command(),cwd=RESOURCE_ROOT,
-                stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf-8',errors='replace',
-                env={**os.environ,'PYTHONIOENCODING':'utf-8'},creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
-            threading.Thread(target=self._read,args=(self._process,),daemon=True).start()
-        self._process.stdin.write(json.dumps(command,ensure_ascii=True)+'\n'); self._process.stdin.flush()
+        self._worker_failure_message=None
+        try:
+            if self._process is None or self._process.poll() is not None:
+                self._process=None
+                self._process=subprocess.Popen(worker_command(),cwd=RESOURCE_ROOT,
+                    stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True,encoding='utf-8',errors='replace',
+                    env={**os.environ,'PYTHONIOENCODING':'utf-8'},creationflags=subprocess.CREATE_NO_WINDOW if os.name=='nt' else 0)
+                threading.Thread(target=self._read,args=(self._process,),daemon=True).start()
+            self._process.stdin.write(json.dumps(command,ensure_ascii=True)+'\n'); self._process.stdin.flush()
+        except (OSError,ValueError) as error:
+            raise WorkerStartError(self._worker_failure(error=error)) from None
+
+    def _worker_failure(self,error=None,returncode=None,loader_hint=None):
+        code=getattr(error,'winerror',None) or getattr(error,'errno',None)
+        if isinstance(error,FileNotFoundError) or code in (2,3):
+            reason='未找到后台程序或运行目录。请确认安装目录中有 iTEST-worker.exe 和 _internal 文件夹；若文件缺失，请重新下载安装包修复安装，并查看 Windows 安全中心的保护历史记录。'
+        elif code in (225,226):
+            reason='Windows 安全软件阻止了后台程序启动。请查看 Windows 安全中心的保护历史记录，核对被拦截文件和安装包来源。'
+        elif isinstance(error,PermissionError) or code in (5,13,740):
+            reason='系统拒绝启动后台程序。请检查安装目录的访问权限及 Windows 安全中心的保护历史记录。'
+        elif code in (126,193,216,1114,14001) or loader_hint or (returncode is not None and (returncode & 0xffffffff) in (0xc0000135,0xc000007b,0xc0000142)):
+            reason='后台运行库未能加载。请使用 Windows x64 安装包修复安装，保留完整的 _internal 文件夹。'
+        else:
+            reason='后台进程提前退出或通信中断。请修复安装，并将运行记录中的错误编号反馈给开发者。'
+        detail=f'系统错误 {code}' if code is not None else (f'退出码 0x{returncode & 0xffffffff:08X}' if returncode is not None else type(error).__name__)
+        message=f'后台启动失败：{reason}（{detail}）'
+        # Never persist exception strings, commands, stdout or configuration: they may contain secrets.
+        record={'time':datetime.datetime.now(datetime.timezone.utc).isoformat(),'error_type':type(error).__name__ if error else None,
+                'system_code':code,'exit_code':returncode,'loader_error':bool(loader_hint)}
+        try:
+            folder=self._root/'.exam_work';folder.mkdir(parents=True,exist_ok=True)
+            with (folder/'startup.log').open('a',encoding='utf-8') as stream:
+                stream.write(json.dumps(record,ensure_ascii=True)+'\n')
+        except OSError: pass
+        self._worker_failure_message=message
+        self._state['logs']=(self._state['logs']+[message])[-600:]
+        return message
 
     def _read(self,process):
+        loader_hint=False
         try:
             for line in process.stdout:
                 try:
                     event=json.loads(line)
                     if isinstance(event,dict): self._event(process,event)
-                except ValueError: pass
+                except ValueError:
+                    if any(marker in line.lower() for marker in ('failed to load python dll','modulenotfounderror','importerror:','error loading python dll')):
+                        loader_hint=True
         finally:
-            process.wait(); self._event(process,{'event':'exit'})
+            code=process.wait()
+            self._event(process,{'event':'exit','returncode':code,'loader_hint':loader_hint})
 
     def _event(self,process,event):
         with self._lock:
@@ -388,8 +431,10 @@ class Bridge:
             elif kind=='papers':
                 self._state.update(papers=event['papers'],connected=True,busy=False,activity='idle',status=f'已获取 {len(event["papers"])} 张试卷',completed=False)
             elif kind in ('done','error'):
+                text=('网站已确认提交成功。' if event.get('submitted') else '答案已填写，尚未交卷。请在浏览器中检查。') if kind=='done' else self._redact(str(event['message']))
+                if kind=='error': self._worker_failure_message=text
                 if self._state['account_test'].get('busy'):
-                    self._state['account_test'].update(busy=False,ok=False,message='登录测试中断，请检查网络和浏览器后重试。')
+                    self._state['account_test'].update(busy=False,ok=False,message=text)
                 self._state.update(busy=False,activity='idle',completed=True,progress=None)
                 if isinstance(event.get('papers'),list):
                     self._state['papers']=event['papers']
@@ -410,12 +455,16 @@ class Bridge:
                 self._state['logs']=(self._state['logs']+[self._redact(text)])[-600:]
                 self._notice(text,kind=='error')
             elif kind=='exit':
+                failure=self._worker_failure_message
+                if event.get('returncode') and not failure:
+                    failure=self._worker_failure(returncode=event['returncode'],loader_hint=event.get('loader_hint'))
+                    self._notice(failure,True)
                 if self._state['account_test'].get('busy'):
-                    self._state['account_test'].update(busy=False,ok=False,message='测试后台已退出，请重试。')
+                    self._state['account_test'].update(busy=False,ok=False,message=failure or '测试后台已退出，请重试。')
                 if self._task and self._task.value['status']=='running':
                     self._task.fail('后台意外退出，请查看日志和网页。')
                     self._state['task']=self._task.snapshot()
-                self._process=None; self._state.update(busy=False,activity='idle',connected=False,status='后台已退出，可重新获取试卷')
+                self._process=None; self._state.update(busy=False,activity='idle',connected=False,status=failure or '后台已退出，可重新获取试卷')
             self._touch()
 
     def _on_closing(self):
