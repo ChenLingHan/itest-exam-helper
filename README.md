@@ -8,7 +8,7 @@ v1.2.0 提交中的原创贡献另按 **MIT** 授权（含历史版本）；范�
 
 ## 下载安装
 
-在 [Releases](https://github.com/ChenLingHan/itest-exam-helper/releases/tag/v1.2.2) 下载 `iTEST-Exam-Helper-1.2.2-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
+在 [Releases](https://github.com/ChenLingHan/itest-exam-helper/releases/tag/v1.2.3) 下载 `iTEST-Exam-Helper-1.2.3-windows-x64-setup.exe`，双击安装，完成后从桌面或开始菜单打开 **iTEST**。
 
 - 支持 Windows 10/11 64 位（x64），无需安装 Python 或手动安装依赖。
 - 内置英语离线语音模型及 FFmpeg。
