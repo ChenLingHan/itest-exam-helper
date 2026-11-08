@@ -44,6 +44,9 @@ class TaskProgress:
             for key,total in (('download',audio),('transcribe',audio),('generate',groups),('fill',questions)):
                 self._get(key)['total']=total
             self._stage('download' if audio else 'generate'); self.value['detail']='开始下载对应听力录音' if audio else '纯文字试卷，无需录音，正在准备答案'
+        elif '考试冲突，等待手动确认' in message:
+            self._get('enter')['state']='waiting'
+            self.value['detail']='请在 Edge 中点「确定」继续，或点「取消」结束任务。'
         elif '题目页面已就绪' in message:
             stage=self._get('enter'); stage.update(done=1,state='complete')
             self.value['detail']='试卷已就绪，正在读取题目'

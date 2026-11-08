@@ -121,3 +121,4 @@ button.primary.is-saved:hover:not(:disabled){background:#dff2e5;border-color:#36
 .update-progress{height:4px;background:#e8edf5;border-radius:6px;overflow:hidden;margin-top:11px}.update-progress>span{display:block;height:100%;background:#3155e7;transition:width .2s}
 .update-caption{font-size:10px;color:#8793a3;margin-top:5px}.update-caption:empty{display:none}#updateNotesText{white-space:pre-wrap;font:11px/1.7 inherit;overflow-wrap:anywhere;margin:10px 0 0;color:#687588;max-height:200px;overflow:auto}
 @media(max-width:740px){.update-row{align-items:flex-start;flex-direction:column}.update-buttons{justify-content:flex-start}}
+.task-card.awaiting-confirmation .task-detail{white-space:normal}

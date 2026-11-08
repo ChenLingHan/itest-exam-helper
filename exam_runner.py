@@ -21,7 +21,12 @@ from model_presets import normalize_ai, request_options
 from browser_startup import start_edge
 from parsel import Selector
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchWindowException, TimeoutException, WebDriverException
+from selenium.common.exceptions import (
+    NoSuchWindowException,
+    StaleElementReferenceException,
+    TimeoutException,
+    WebDriverException,
+)
 from selenium.webdriver.common.by import By
 from selenium.webdriver.edge.service import Service
 from selenium.webdriver.support import expected_conditions as EC
@@ -35,6 +40,10 @@ LOG = logging.getLogger("exam_runner")
 
 
 from exam_schema import SchemaError as RunError, parse_groups, validate_answers, CONTROL_SCRIPT
+
+
+class ExamEntryCancelled(RunError):
+    """The user closed the exam tab during manual confirmation."""
 
 
 def write_json(path, value):
@@ -246,39 +255,67 @@ class ExamRunner:
         if not url:
             raise RunError("刷新考试入口失败：" + str(refreshed.get("msg", "未提供原因")))
         self.driver.get(url + "&returnUrl=" + RETURN_URL + "&skipEnvTest=true")
-        self.ready()
+        try:
+            self.ready(allow_manual_confirmation=not self.headless)
+        except ExamEntryCancelled:
+            self.driver.switch_to.window(self.list_window)
+            raise
         LOG.info("题目页面已就绪。")
 
-    def ready(self):
+    def ready(self, *, allow_manual_confirmation=False):
         deadline = time.monotonic() + 90
+        conflict_window = None
         while time.monotonic() < deadline:
-            if len(self.driver.window_handles) > 1:
-                self.driver.switch_to.window(self.driver.window_handles[-1])
-            sections = self.driver.find_elements(By.CSS_SELECTOR, "#main-content .itest-section")
-            layers = self.driver.find_elements(By.CSS_SELECTOR, ".layui-layer")
-            visible_layers = [layer for layer in layers if layer.is_displayed()]
-            if visible_layers:
-                layer = visible_layers[-1]
-                text = layer.text
-                if any(word in text for word in ("参数缺失", "退出登录", "无权", "已结束", "考试已提交")):
-                    raise RunError("考试页面提示：" + text.replace("\n", " "))
-                buttons = layer.find_elements(By.CSS_SELECTOR, ".layui-layer-btn0")
-                if buttons:
-                    LOG.info("处理进入提示：%s", text.replace("\n", " ")[:100])
-                    buttons[0].click()
+            try:
+                windows = self.driver.window_handles
+                if conflict_window is not None:
+                    if conflict_window not in windows:
+                        raise ExamEntryCancelled("已关闭考试确认页，本次任务已取消。")
+                elif len(windows) > 1:
+                    self.driver.switch_to.window(windows[-1])
+                layers = self.driver.find_elements(By.CSS_SELECTOR, ".layui-layer")
+                visible_prompts = [(layer, layer.text) for layer in layers if layer.is_displayed()]
+                conflict = self.driver.title == "答题页面冲突" or any(
+                    "考试冲突" in text or "尚未完成该考试" in text for _, text in visible_prompts
+                )
+                if conflict:
+                    if not allow_manual_confirmation:
+                        raise RunError("考试冲突：请在官网处理尚未完成的考试。")
+                    if conflict_window is None:
+                        conflict_window = self.driver.current_window_handle
+                        LOG.info("考试冲突，等待手动确认。请在 Edge 中点「确定」继续，或点「取消」结束任务。")
+                    # 用户操作的时间不计入答题页加载超时。
+                    deadline = time.monotonic() + 90
+                    time.sleep(0.4)
+                    continue
+                if visible_prompts:
+                    layer, text = visible_prompts[-1]
+                    if any(word in text for word in ("参数缺失", "退出登录", "无权", "已结束", "考试已提交")):
+                        raise RunError("考试页面提示：" + text.replace("\n", " "))
+                    buttons = layer.find_elements(By.CSS_SELECTOR, ".layui-layer-btn0")
+                    if buttons:
+                        buttons[0].click()
+                        LOG.info("已处理进入提示：%s", text.replace("\n", " ")[:100])
+                        time.sleep(0.3)
+                        continue
+                success = self.driver.find_elements(By.CSS_SELECTOR, "#success-ok")
+                if success and success[0].is_displayed():
+                    success[0].click()
                     time.sleep(0.3)
                     continue
-            success = self.driver.find_elements(By.CSS_SELECTOR, "#success-ok")
-            if success and success[0].is_displayed():
-                success[0].click()
-                time.sleep(0.3)
-                continue
-            if sections:
-                buttons = self.driver.find_elements(By.CSS_SELECTOR, "#submit-answer")
-                clocks = self.driver.find_elements(By.CSS_SELECTOR, "#daojishi")
-                clock_ready = bool(clocks and re.fullmatch(r"\d{2}:\d{2}:\d{2}", clocks[0].text.strip()))
-                if buttons and buttons[0].is_displayed() and clock_ready:
-                    return
+                if self.driver.find_elements(By.CSS_SELECTOR, "#main-content .itest-section"):
+                    buttons = self.driver.find_elements(By.CSS_SELECTOR, "#submit-answer")
+                    clocks = self.driver.find_elements(By.CSS_SELECTOR, "#daojishi")
+                    clock_ready = bool(clocks and re.fullmatch(r"\d{2}:\d{2}:\d{2}", clocks[0].text.strip()))
+                    if buttons and buttons[0].is_displayed() and clock_ready:
+                        return
+            except StaleElementReferenceException:
+                # 页面重绘后重新查找控件，不能重用上一轮的元素。
+                LOG.debug("考试页面已更新，重新检查当前页面。")
+            except NoSuchWindowException as error:
+                if conflict_window is None:
+                    raise
+                raise ExamEntryCancelled("已关闭考试确认页，本次任务已取消。") from error
             time.sleep(0.4)
         raise RunError("等待题目加载超时，请查看网页提示。")
 

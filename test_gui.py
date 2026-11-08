@@ -8,10 +8,13 @@ import subprocess
 import threading
 import types
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, PropertyMock, patch
+
+from selenium.common.exceptions import StaleElementReferenceException
 
 import gui
 from desktop_bridge import Bridge
+from exam_runner import ExamEntryCancelled, ExamRunner, RunError
 import gui_worker
 
 
@@ -26,8 +29,87 @@ class ConfigTests(unittest.TestCase):
             gui.validate_config(config, need_ai=True)
 
 
+class ExamEntryTests(unittest.TestCase):
+    def setUp(self):
+        self.runner = ExamRunner({})
+        self.runner.driver = MagicMock()
+        self.runner.driver.window_handles = ["exam"]
+        self.runner.driver.current_window_handle = "exam"
+
+    def test_rechecks_page_when_popup_is_replaced_before_click(self):
+        layer = MagicMock(text="入场提示")
+        button = MagicMock()
+        button.click.side_effect = StaleElementReferenceException
+        layer.find_elements.return_value = [button]
+        pages = iter(([layer], []))
+        controls = {
+            "#main-content .itest-section": [MagicMock()],
+            "#submit-answer": [MagicMock()],
+            "#daojishi": [MagicMock(text="00:10:00")],
+        }
+
+        def find_elements(by, selector):
+            if selector == ".layui-layer":
+                return next(pages)
+            return controls.get(selector, [])
+
+        self.runner.driver.find_elements.side_effect = find_elements
+        with patch("exam_runner.time") as clock:
+            clock.monotonic.side_effect = [0, 1, 2, 91]
+            self.runner.ready()
+        button.click.assert_called_once()
+
+    def test_conflict_stops_before_clicking_any_popup(self):
+        conflict = MagicMock(text="考试冲突\n系统显示您尚未完成该考试。")
+        other = MagicMock(text="入场提示")
+        self.runner.driver.find_elements.return_value = [conflict, other]
+        with self.assertRaisesRegex(RunError, "考试冲突.*尚未完成"):
+            self.runner.ready()
+        conflict.find_elements.assert_not_called()
+        other.find_elements.assert_not_called()
+
+    def test_manual_confirmation_waits_then_resumes_when_exam_is_ready(self):
+        driver = self.runner.driver
+        conflict = MagicMock(text="考试冲突")
+        pages = iter(([conflict], [conflict], []))
+        controls = {
+            "#main-content .itest-section": [MagicMock()],
+            "#submit-answer": [MagicMock()],
+            "#daojishi": [MagicMock(text="00:10:00")],
+        }
+
+        def find_elements(by, selector):
+            if selector == ".layui-layer":
+                return next(pages)
+            return controls.get(selector, [])
+
+        driver.find_elements.side_effect = find_elements
+        with patch("exam_runner.time") as clock, self.assertLogs("exam_runner", level="INFO") as logs:
+            clock.monotonic.side_effect = [0, 1, 1, 89, 89, 175]
+            self.runner.ready(allow_manual_confirmation=True)
+        conflict.find_elements.assert_not_called()
+        self.assertEqual(len(logs.output), 1)
+        self.assertIn("等待手动确认", logs.output[0])
+
+    def test_cancelling_confirmation_restores_the_exam_list(self):
+        driver = self.runner.driver
+        self.runner.list_window = "list"
+        driver.title = "答题页面冲突"
+        with patch.object(type(driver), "window_handles", new_callable=PropertyMock, create=True) as windows, \
+             patch("exam_runner.time.sleep"), tempfile.TemporaryDirectory() as folder, \
+             patch("exam_runner.ROOT", Path(folder)), patch.object(self.runner, "post") as post:
+            windows.side_effect = [["list", "exam"], ["list"]]
+            post.side_effect = [
+                {"code": 1, "data": {"url": "https://example.com/check?entry=1", "token": "test"}},
+                {"rs": {"url": "https://example.com/exam?entry=1"}},
+            ]
+            with self.assertRaisesRegex(ExamEntryCancelled, "任务已取消"):
+                self.runner.enter({"ksdId": "123", "type": 0}, exam_code="")
+        driver.switch_to.window.assert_called_with("list")
+
+
 class WorkerTests(unittest.TestCase):
-    def workflow(self, auto_submit, fail=False):
+    def workflow(self, auto_submit, fail=False, cancel=False):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             runner = MagicMock()
@@ -43,7 +125,9 @@ class WorkerTests(unittest.TestCase):
             solver.prepare.return_value = [{"id": "q1", "value": "A"}]
             if fail:
                 solver.prepare.side_effect = ValueError("private-api-key invalid")
-            module = types.SimpleNamespace(ROOT=root, ExamRunner=MagicMock(return_value=runner), ListeningSolver=MagicMock(return_value=solver), parse_groups=MagicMock(return_value=[]))
+            if cancel:
+                runner.enter.side_effect = ExamEntryCancelled("本次任务已取消。")
+            module = types.SimpleNamespace(ROOT=root, ExamRunner=MagicMock(return_value=runner), ListeningSolver=MagicMock(return_value=solver), parse_groups=MagicMock(return_value=[]), ExamEntryCancelled=ExamEntryCancelled)
             commands = [{"action": "load", "config": runner.config}, {"action": "run", "index": 0, "exam_code": "123456", "auto_submit": auto_submit}, {"action": "close"}]
             output = io.StringIO()
             handlers = logging.getLogger().handlers[:]
@@ -83,6 +167,12 @@ class WorkerTests(unittest.TestCase):
         self.assertEqual(events[-1]["event"], "error")
         self.assertNotIn("private-api-key", events[-1]["message"])
 
+    def test_cancelling_entry_stops_before_answer_processing(self):
+        runner, events = self.workflow(True, cancel=True)
+        runner.fill.assert_not_called()
+        runner.submit.assert_not_called()
+        self.assertEqual(events[-1]["event"], "cancelled")
+
 
 class BridgeTests(unittest.TestCase):
     def setUp(self):
@@ -99,6 +189,21 @@ class BridgeTests(unittest.TestCase):
 
     def tearDown(self):
         self.folder.cleanup()
+
+    def test_conflict_wait_and_cancel_updates_task_card(self):
+        with patch.object(self.bridge, '_send'):
+            self.bridge._run({'index': 0, 'auto_submit': False})
+        self.bridge._event(self.process, {'event': 'log', 'message': '考试冲突，等待手动确认。'})
+        waiting = self.bridge.get_state()
+        self.assertTrue(waiting['busy'])
+        self.assertEqual(waiting['task']['stages'][0]['state'], 'waiting')
+        self.assertIn('Edge', waiting['task']['detail'])
+        self.bridge._event(self.process, {'event': 'cancelled', 'message': '本次任务已取消。'})
+        cancelled = self.bridge.get_state()
+        self.assertFalse(cancelled['busy'])
+        self.assertFalse(cancelled['completed'])
+        self.assertEqual(cancelled['task']['status'], 'stopped')
+        self.assertEqual(cancelled['papers'], waiting['papers'])
 
     def test_confirm_is_required_and_single_use(self):
         with patch.object(self.bridge, '_send') as send:

@@ -469,6 +469,13 @@ class Bridge:
                     self._state.update(busy=False,activity='idle',status=event.get('message','检查已结束'))
             elif kind=='papers':
                 self._state.update(papers=event['papers'],connected=True,busy=False,activity='idle',status=f'已获取 {len(event["papers"])} 张试卷',completed=False)
+            elif kind=='cancelled':
+                message=self._redact(str(event['message']))
+                self._state.update(busy=False,activity='idle',completed=False,progress=None,status='本次任务已取消')
+                self._state['logs']=(self._state['logs']+[message])[-600:]
+                if self._task:
+                    self._task.fail(message,stopped=True)
+                    self._state['task']=self._task.snapshot()
             elif kind in ('done','error'):
                 text=('网站已确认提交成功。' if event.get('submitted') else '答案已填写，尚未交卷。请在浏览器中检查。') if kind=='done' else self._redact(str(event['message']))
                 if kind=='error': self._worker_failure_message=text

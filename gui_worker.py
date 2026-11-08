@@ -57,7 +57,7 @@ def check_account(config, runner_factory, browser_only=False):
 
 
 def main():
-    from exam_runner import ExamRunner, ListeningSolver, ROOT, parse_groups
+    from exam_runner import ExamEntryCancelled, ExamRunner, ListeningSolver, ROOT, parse_groups
 
     logs = ROOT / ".exam_work"
     logs.mkdir(exist_ok=True)
@@ -102,6 +102,8 @@ def main():
                             emit("done", submitted=False, refresh_error=True)
                 elif command["action"] == "close":
                     break
+            except ExamEntryCancelled as error:
+                emit("cancelled", message=str(error))
             except Exception as error:
                 if runner and runner.driver and runner.cache:
                     try:
