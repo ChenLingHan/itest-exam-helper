@@ -1,5 +1,6 @@
 """Normalize supported iTEST form controls before any model call or browser write."""
 import json
+from urllib.parse import urlsplit
 from parsel import Selector
 
 
@@ -13,6 +14,44 @@ def text_content(node):
 
 def identity(attrs):
     return attrs.get('name') or attrs.get('id') or '|'.join(attrs.get(k, '') for k in ('qid', 'qindex', 'qsubindex'))
+
+
+def is_audio_url(value):
+    if not isinstance(value, str):
+        return False
+    try:
+        url = urlsplit(value)
+    except ValueError:
+        return False
+    return url.scheme == 'https' and url.netloc.lower() == 'itestres.unipus.cn' and url.path.lower().endswith('.mp3')
+
+
+def read_audio(node):
+    audio = []
+    has_pauses = False
+    for field in node.css('.itest-hear-reslist'):
+        raw = field.xpath('string(.)').get().strip()
+        try:
+            resources = json.loads(raw) if raw else []
+        except ValueError as error:
+            raise SchemaError('听力资源格式无效。') from error
+        if not isinstance(resources, list):
+            raise SchemaError('听力资源列表格式无效。')
+        for resource in resources:
+            # The site's playlist mixes recordings with pauses expressed in seconds.
+            if resource is None or resource == '':
+                continue
+            if (type(resource) is int and resource >= 0) or (
+                isinstance(resource, str) and resource.isascii() and resource.isdecimal()
+            ):
+                has_pauses = True
+                continue
+            if not is_audio_url(resource):
+                raise SchemaError('题目有听力资源但无法读取，已停止。')
+            audio.append(resource)
+    if has_pauses and not audio:
+        raise SchemaError('听力播放列表只有停顿，缺少录音，已停止。')
+    return list(dict.fromkeys(audio))
 
 
 def parse_groups(html):
@@ -60,18 +99,9 @@ def parse_groups(html):
                     raise SchemaError('选项为空或值重复，已停止。')
         seen.update(questions)
         covered += len(controls)
-        raw = node.css('.itest-hear-reslist::text').get()
-        try:
-            resources = json.loads(raw) if raw else []
-        except ValueError as error:
-            raise SchemaError('听力资源格式无效。') from error
-        if not isinstance(resources, list):
-            raise SchemaError('听力资源列表格式无效。')
-        audio = list(dict.fromkeys(url for url in resources if isinstance(url, str) and url.startswith('https://') and '/quesres/' in url))
+        audio = read_audio(node)
         section = node.xpath('ancestor::*[contains(concat(" ", normalize-space(@class), " "), " itest-section ")][1]')
         context = text_content(section if section else node)
-        if (raw and any(resources)) and not audio:
-            raise SchemaError('题目有听力资源但无法读取，已停止。')
         if (section if section else node).css('img, video, canvas, iframe, [contenteditable=true]'):
             raise SchemaError('题目含图片、视频或富文本控件，当前版本需要人工处理，已停止。')
         groups.append({'number': len(groups) + 1, 'audio': audio, 'context': context, 'questions': list(questions.values())})

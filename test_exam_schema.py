@@ -1,4 +1,5 @@
 """Offline regression cases for mixed exam forms and model output boundaries."""
+import json
 import tempfile
 from pathlib import Path
 import unittest
@@ -67,6 +68,25 @@ class ExamSchemaTests(unittest.TestCase):
         group = parse_groups(MIXED.replace('<p>Choose and explain.</p>', '<span class="itest-hear-reslist">["https://itestres.unipus.cn/quesres/test.mp3"]</span>'))[0]
         self.assertEqual(len(group['questions']), 5)
         self.assertEqual(len(group['audio']), 1)
+
+    def test_mixed_paper_loads_legacy_recordings_and_ignores_playlist_pauses(self):
+        root = 'https://itestres.unipus.cn/itest-product/'
+        old_paths = ['resourcefile/201311/passage.mp3', 'mr/quesx4/question.mp3']
+        urls = [root + path for path in old_paths]
+        playlist = json.dumps([urls[0], '2', urls[1], 15, urls[0]])
+        hearing = f'<div class="itest-ques-set"><div class="itest-hear-reslist">{playlist}</div><input qid="6" name="listening"></div>'
+        html = MIXED.replace('</div></div></div>', '</div>' + hearing + '</div></div>')
+        written, listening = parse_groups(html)
+        self.assertEqual(written['audio'], [])
+        self.assertIn('textarea', [q['type'] for q in written['questions']])
+        self.assertEqual(listening['audio'], urls)
+
+    def test_missing_or_untrusted_recordings_do_not_become_text_only(self):
+        valid = 'https://itestres.unipus.cn/quesres/test.mp3'
+        for entries in (['15'], [valid, 'https://example.com/quesres/audio.mp3']):
+            html = MIXED.replace('<p>Choose and explain.</p>', f'<span class="itest-hear-reslist">{json.dumps(entries)}</span>')
+            with self.subTest(entries=entries), self.assertRaises(SchemaError):
+                parse_groups(html)
 
 
 if __name__ == '__main__':

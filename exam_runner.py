@@ -39,7 +39,7 @@ RETURN_URL = SITE + "/utest/itest/s/exam"
 LOG = logging.getLogger("exam_runner")
 
 
-from exam_schema import SchemaError as RunError, parse_groups, validate_answers, CONTROL_SCRIPT
+from exam_schema import SchemaError as RunError, is_audio_url, parse_groups, validate_answers, CONTROL_SCRIPT
 
 
 class ExamEntryCancelled(RunError):
@@ -62,7 +62,7 @@ class ExamSolver:
         return self.audio_dir / (hashlib.sha256(url.encode()).hexdigest()[:24] + ".mp3")
 
     def download(self, url):
-        if urlparse(url).hostname != "itestres.unipus.cn":
+        if not is_audio_url(url):
             raise RunError("录音资源不来自预期的网站，已停止下载。")
         path = self.audio_path(url)
         if path.exists() and path.stat().st_size > 100:
